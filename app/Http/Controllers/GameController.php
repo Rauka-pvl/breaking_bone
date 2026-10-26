@@ -202,12 +202,7 @@ class GameController extends Controller
     private function clientConfig(HostKey $room): array
     {
         return [
-            'reverb' => [
-                'key' => config('broadcasting.connections.reverb.key'),
-                'host' => config('broadcasting.connections.reverb.options.host'),
-                'port' => (int) config('broadcasting.connections.reverb.options.port'),
-                'scheme' => config('broadcasting.connections.reverb.options.scheme'),
-            ],
+            'reverb' => config('zhilik.client_reverb'),
             'room' => $room->code,
             'channel' => $room->channel(),
             'api' => url("/api/rooms/{$room->code}"),

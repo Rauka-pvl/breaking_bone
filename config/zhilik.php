@@ -32,6 +32,15 @@ return [
     // Each host key gets its own channel: "{channel}.{room code}".
     'channel' => env('ZHILIK_CHANNEL', 'zhilik.room'),
 
+    // Where browsers connect to Reverb. Can differ from REVERB_HOST, which the
+    // server uses to publish (e.g. 127.0.0.1:8080 behind an nginx wss proxy).
+    'client_reverb' => [
+        'key' => env('VITE_REVERB_APP_KEY') ?: env('REVERB_APP_KEY'),
+        'host' => env('VITE_REVERB_HOST') ?: env('REVERB_HOST'),
+        'port' => (int) (env('VITE_REVERB_PORT') ?: env('REVERB_PORT', 443)),
+        'scheme' => env('VITE_REVERB_SCHEME') ?: env('REVERB_SCHEME', 'https'),
+    ],
+
     'sides' => ['left', 'right'],
 
 ];
