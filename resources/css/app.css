@@ -332,6 +332,27 @@ html, body {
 .conn i { width: 9px; height: 9px; border-radius: 50%; background: #e5383b; display: inline-block; }
 .conn.ok i { background: #3ddc84; }
 
+.music-btn {
+    position: fixed;
+    right: 12px;
+    bottom: 58px;
+    z-index: 60;
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    border: 1px solid var(--gold);
+    background: rgba(8, 20, 43, 0.6);
+    color: var(--gold);
+    font-size: 1.1rem;
+    line-height: 1;
+    cursor: pointer;
+    opacity: 0.7;
+    transition: opacity 0.2s;
+}
+
+.music-btn:hover { opacity: 1; }
+.music-btn.off { opacity: 0.4; text-decoration: line-through; }
+
 .room-badge {
     position: fixed;
     left: 12px;
@@ -538,3 +559,120 @@ code.key { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-siz
 .result-title { font-size: 3rem; font-weight: 900; line-height: 1.05; }
 .result-title.win { color: var(--gold); text-shadow: 0 6px 0 #8a6408; animation: count-pop 0.9s ease-out both; }
 .result-title.lose { color: #c7cbd6; }
+
+/* Phone result: the bone cracks, snaps in two, then the winner is revealed. */
+.view-result { position: relative; overflow-x: hidden; justify-content: flex-start; gap: 12px; padding-top: 14px; padding-bottom: 16px; }
+.view-result .after { display: flex; flex-direction: column; align-items: center; gap: 6px; margin-bottom: auto; }
+.view-result .result-title { font-size: 2.1rem; }
+.view-result .my-taps { font-size: 2.4rem; }
+
+.break-scene { position: relative; width: min(66vw, 280px); aspect-ratio: 572 / 168; flex-shrink: 0; margin: auto 0 26px; }
+.break-bone { width: 100%; height: 100%; overflow: visible; filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.45)); }
+.break-bone .half { transform-box: fill-box; transform-origin: center; }
+.break-bone .crack { stroke-dasharray: 1; stroke-dashoffset: 1; }
+.break-flash {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 70%;
+    aspect-ratio: 1;
+    translate: -50% -50%;
+    border-radius: 50%;
+    background: radial-gradient(circle, #fff7d6 0%, rgba(247, 201, 72, 0.85) 32%, rgba(247, 201, 72, 0) 70%);
+    opacity: 0;
+    pointer-events: none;
+}
+.break-chips i {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: var(--s);
+    height: var(--s);
+    border-radius: 2px;
+    background: #f3e4c3;
+    box-shadow: 0 0 0 1.5px #6e4f26;
+    opacity: 0;
+}
+
+.winner-card {
+    position: relative;
+    isolation: isolate;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    max-width: 88vw;
+    padding: 10px 24px 12px;
+    border-radius: 20px;
+    background: linear-gradient(180deg, rgba(247, 201, 72, 0.2), rgba(8, 20, 43, 0.75));
+    box-shadow: 0 0 0 3px var(--gold), 0 12px 30px rgba(0, 0, 0, 0.45);
+}
+.winner-card::before {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 360px;
+    height: 360px;
+    translate: -50% -50%;
+    z-index: -1;
+    border-radius: 50%;
+    background: repeating-conic-gradient(rgba(247, 201, 72, 0.22) 0 10deg, transparent 10deg 20deg);
+    -webkit-mask: radial-gradient(circle, #000 25%, transparent 68%);
+    mask: radial-gradient(circle, #000 25%, transparent 68%);
+    animation: rays-spin 14s linear infinite;
+}
+.winner-card.none { display: none; }
+.winner-card .crown { font-size: 2.1rem; line-height: 1; }
+.winner-card .label { font-size: 0.78rem; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; opacity: 0.85; }
+.winner-card .name { max-width: 78vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 1.85rem; font-weight: 900; color: var(--gold); text-shadow: 0 4px 0 #8a6408; }
+.winner-card .meta { font-size: 0.95rem; opacity: 0.85; }
+
+.view-result .confetti { position: absolute; inset: 0; z-index: 3; overflow: hidden; pointer-events: none; }
+.view-result .confetti i { position: absolute; top: -24px; left: var(--x); width: 8px; height: 14px; border-radius: 2px; background: var(--c); opacity: 0; }
+
+.view-result.go .break-bone { animation: bone-strain 0.6s ease-in both; }
+.view-result.go .crack { animation: crack-draw 0.45s 0.1s ease-in forwards, fade-out 0.15s 0.62s forwards; }
+.view-result.go .half-l { animation: half-left 1.1s 0.6s cubic-bezier(0.2, 0.8, 0.3, 1) forwards; }
+.view-result.go .half-r { animation: half-right 1.1s 0.6s cubic-bezier(0.2, 0.8, 0.3, 1) forwards; }
+.view-result.go .break-flash { animation: break-flash 0.7s 0.6s ease-out; }
+.view-result.go .break-chips i { animation: chip-burst 0.9s 0.6s cubic-bezier(0.2, 0.7, 0.4, 1); }
+.view-result.go .winner-card { animation: winner-in 0.7s 1.05s cubic-bezier(0.2, 1.4, 0.4, 1) both; }
+.view-result.go .winner-card .crown { animation: crown-drop 0.6s 1.45s cubic-bezier(0.3, 1.6, 0.5, 1) both; }
+.view-result.go .after { animation: fade-up 0.5s 1.7s ease-out both; }
+.view-result.go .after .result-title.win { animation-delay: 1.7s; }
+.view-result.go .confetti i { animation: confetti-fall var(--t) calc(var(--d) + 0.6s) linear forwards; }
+
+@keyframes bone-strain {
+    0% { transform: none; }
+    20% { transform: translate(-3px, 0) rotate(-1deg); }
+    40% { transform: translate(3px, 1px) rotate(1deg); }
+    60% { transform: translate(-4px, 0) rotate(-1.5deg); }
+    80% { transform: translate(4px, 2px) rotate(1.5deg) scale(1.03); }
+    100% { transform: translate(0, 3px) scale(1.04); }
+}
+@keyframes crack-draw { to { stroke-dashoffset: 0; } }
+@keyframes fade-out { to { opacity: 0; } }
+@keyframes half-left {
+    0% { transform: none; }
+    30% { transform: translate(-50px, 30px) rotate(-20deg); }
+    100% { transform: translate(-60px, -14px) rotate(9deg); }
+}
+@keyframes half-right {
+    0% { transform: none; }
+    30% { transform: translate(50px, 30px) rotate(20deg); }
+    100% { transform: translate(60px, -14px) rotate(-9deg); }
+}
+@keyframes break-flash { 0% { opacity: 1; transform: scale(0.2); } 100% { opacity: 0; transform: scale(2.6); } }
+@keyframes chip-burst {
+    0% { opacity: 1; transform: translate(-50%, -50%); }
+    100% { opacity: 0; transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) rotate(var(--r)); }
+}
+@keyframes winner-in { from { opacity: 0; transform: scale(0.3) translateY(30px); } to { opacity: 1; transform: none; } }
+@keyframes crown-drop { from { opacity: 0; transform: translateY(-40px) rotate(-20deg); } to { opacity: 1; transform: none; } }
+@keyframes fade-up { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
+@keyframes rays-spin { to { rotate: 360deg; } }
+@keyframes confetti-fall {
+    0% { opacity: 1; transform: translate(0, 0) rotate(0); }
+    100% { opacity: 0.9; transform: translate(var(--sway), 105dvh) rotate(var(--r)); }
+}

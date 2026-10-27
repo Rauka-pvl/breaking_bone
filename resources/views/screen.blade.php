@@ -74,5 +74,6 @@
         <button type="submit">Шығу</button>
     </form>
 </div>
+<button class="music-btn" id="musicBtn" type="button" title="Музыка · Әуен">♪</button>
 <div class="conn" id="conn"><i></i><span>Reverb</span></div>
 @endsection

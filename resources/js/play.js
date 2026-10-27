@@ -1,4 +1,4 @@
-import { api, config, createClock, createEcho, escapeHtml, formatSeconds, isEchoConnected, phaseOf } from './common';
+import { api, config, createClock, createEcho, formatSeconds, isEchoConnected, phaseOf } from './common';
 
 const $ = (selector) => document.querySelector(selector);
 
@@ -24,7 +24,11 @@ const els = {
     resultSub: $('#resultSub'),
     resultTaps: $('#resultTaps'),
     resultTime: $('#resultTime'),
+    resultView: $('#resultView'),
+    winnerCard: $('#winnerCard'),
+    winnerLabel: $('#winnerLabel'),
     resultWinner: $('#resultWinner'),
+    resultWinnerMeta: $('#resultWinnerMeta'),
     retryBtn: $('#retryBtn'),
 };
 
@@ -53,7 +57,7 @@ let wakeLock = null;
 
 els.nameInput.value = storage.get('name') ?? '';
 
-const target = () => state?.targetTaps ?? 100;
+const target = () => state?.targetTaps ?? 150;
 
 function setView(name) {
     if (root.dataset.view !== name) root.dataset.view = name;
@@ -166,8 +170,11 @@ function showResult() {
     const myTaps = Math.max(me?.taps ?? 0, sent);
     els.resultTaps.textContent = myTaps;
     els.resultTime.textContent = me?.timeMs != null ? `уақыт · время: ${formatSeconds(me.timeMs)}` : 'менің басуым · мои нажатия';
-    els.resultWinner.innerHTML = winner
-        ? `👑 ${escapeHtml(winner.name)}${winner.timeMs != null ? ` · ${formatSeconds(winner.timeMs)}` : ''}`
+    els.winnerCard.classList.toggle('none', !winner);
+    els.winnerLabel.textContent = me?.place === 1 ? 'Сіз жеңдіңіз! · Вы победили!' : 'Жеңімпаз · Победитель';
+    els.resultWinner.textContent = winner?.name ?? '';
+    els.resultWinnerMeta.textContent = winner
+        ? `${winner.taps} басу${winner.timeMs != null ? ` · ${formatSeconds(winner.timeMs)}` : ' · нажатий'}`
         : '';
 
     els.resultTitle.className = 'result-title';
@@ -231,6 +238,9 @@ function tick() {
         case 'finished':
             setView('result');
             if (changed) {
+                els.resultView.classList.remove('go');
+                void els.resultView.offsetWidth;
+                els.resultView.classList.add('go');
                 showResult();
                 if (!state.me) setTimeout(poll, Math.random() * 600);
             }

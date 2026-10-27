@@ -46,6 +46,13 @@
             'cap' => [$x1 - 0.3 * $h, $y - 0.45 * $h, 0.38 * $h, 0.22 * $h],
         ];
     });
+    $palm = 'M -30 -90 C -10 -96, 20 -92, 36 -80 C 50 -66, 54 -30, 40 -10 C 28 2, -10 4, -30 -4 C -48 -12, -60 -32, -58 -52 C -56 -70, -46 -84, -30 -90 Z';
+    // Cloth strips around the fist, clipped to the palm: one across the heel, two crossing over the fingers.
+    $wraps = [
+        'M -52 -100 C -56 -66, -60 -38, -56 0 L -28 8 C -32 -30, -30 -62, -22 -100 Z',
+        'M -36 8 C -22 -32, -6 -66, 8 -102 L 27 -100 C 13 -64, -3 -30, -15 8 Z',
+        'M -25 -102 C -17 -64, -7 -30, 1 10 L 22 8 C 12 -30, 4 -64, -4 -104 Z',
+    ];
     $thumb = 'M -44 -84 C -34 -100, -14 -100, 2 -93 C 10 -89, 18 -84, 23 -79 C 30 -74, 30 -64, 22 -63 C 15 -62, 8 -66, 0 -70 C -10 -73, -20 -72, -30 -64';
 
     $pores = [[168, 104, 1.6], [196, 117, 1.1], [232, 101, 1.2], [262, 119, 0.9], [352, 103, 1.1], [384, 118, 1.3], [418, 105, 1], [446, 116, 1.4], [62, 150, 1.8], [92, 64, 1.3], [538, 156, 1.6], [508, 66, 1.2]];
@@ -137,6 +144,19 @@
             <stop offset="0.5" stop-color="#f2b386"/>
             <stop offset="1" stop-color="#c98153"/>
         </linearGradient>
+        <clipPath id="fistClip"><path d="{{ $palm }}"/></clipPath>
+        <linearGradient id="clothGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#bfb9ac"/>
+            <stop offset="0.25" stop-color="#f4f2ec"/>
+            <stop offset="0.55" stop-color="#ffffff"/>
+            <stop offset="0.85" stop-color="#e6e2d8"/>
+            <stop offset="1" stop-color="#b3ad9f"/>
+        </linearGradient>
+        <linearGradient id="tailGrad" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0" stop-color="#ffffff"/>
+            <stop offset="0.6" stop-color="#efece4"/>
+            <stop offset="1" stop-color="#c9c3b6"/>
+        </linearGradient>
         <linearGradient id="wristGrad" x1="0.9" y1="0" x2="0.1" y2="1">
             <stop offset="0" stop-color="#f6be93"/>
             <stop offset="0.55" stop-color="#e2a072"/>
@@ -177,14 +197,13 @@
             <path d="M -107 -71.1 C -143 -92.1, -181.8 -157.5, -199.8 -267.5" fill="none" stroke="url(#foldGrad)" stroke-width="2.2"/>
             <path d="M -87 -105.5 C -123 -126.5, -142.2 -163.9, -160.2 -273.9" fill="none" stroke="url(#foldLight)" stroke-width="2.4"/>
             <path d="M -101 -81.4 C -137 -102.4, -169.9 -159.4, -187.9 -269.4" fill="none" stroke="url(#foldLight)" stroke-width="1.8"/>
-
             <path d="M -24 -84 C -43.7 -89.3, -61.8 -97.3, -78.5 -107.8 L -102.5 -66.2 C -82.2 -55.4, -63.3 -42, -46 -26 Z" fill="url(#wristGrad)"/>
             <path d="M -24 -84 C -43.7 -89.3, -61.8 -97.3, -78.5 -107.8 M -102.5 -66.2 C -82.2 -55.4, -63.3 -42, -46 -26" fill="none" stroke="#7a4426" stroke-width="1.7"/>
             <path d="M -32 -83 C -48 -88, -62 -95, -76 -103" fill="none" stroke="#ffe2c8" stroke-opacity="0.5" stroke-width="3"/>
             <path d="M -98 -63 C -80 -54, -64 -42, -52 -32" fill="none" stroke="#8f4f2c" stroke-opacity="0.4" stroke-width="4"/>
             <path d="M -50 -89 Q -58 -70, -72 -51 M -56 -86 Q -63 -71, -73 -59" fill="none" stroke="#a8653d" stroke-opacity="0.45" stroke-width="1.2"/>
 
-            <path d="M -30 -90 C -10 -96, 20 -92, 36 -80 C 50 -66, 54 -30, 40 -10 C 28 2, -10 4, -30 -4 C -48 -12, -60 -32, -58 -52 C -56 -70, -46 -84, -30 -90 Z" fill="url(#palmGrad)" stroke="#7a4426" stroke-width="1.8"/>
+            <path d="{{ $palm }}" fill="url(#palmGrad)" stroke="#7a4426" stroke-width="1.8"/>
             <path d="M -50 -50 C -52 -34, -46 -20, -34 -12" fill="none" stroke="#fff" stroke-opacity="0.2" stroke-width="5"/>
             <path d="M -34 -14 C -40 -30, -40 -48, -36 -62" fill="none" stroke="#a8653d" stroke-opacity="0.5" stroke-width="1.3"/>
 
@@ -210,6 +229,16 @@
                 <ellipse cx="{{ $f['cap'][0] }}" cy="{{ $f['cap'][1] }}" rx="{{ $f['cap'][2] }}" ry="{{ $f['cap'][3] }}" fill="#fff" fill-opacity="0.35"/>
             @endforeach
 
+            {{-- White cloth (ақ орамал) wound around the fist before striking the bone; the thumb stays free. --}}
+            <g clip-path="url(#fistClip)">
+                @foreach ($wraps as $d)
+                    <path d="{{ $d }}" fill="#3a2a1a" fill-opacity="0.35" transform="translate(2 2.5)" filter="url(#fistBlur)"/>
+                    <path d="{{ $d }}" fill="url(#clothGrad)" stroke="#a39d90" stroke-width="1"/>
+                @endforeach
+                <path d="M -40 -96 C -44 -62, -47 -34, -43 4 M -14 -100 C -6 -64, 3 -30, 12 9 M -26 8 C -13 -32, 3 -66, 17 -101" fill="none" stroke="#d6d1c6" stroke-width="1.1"/>
+                <path d="M -34 -92 C -36 -70, -38 -50, -38 -34 M -8 -92 C -2 -70, 3 -50, 7 -34" fill="none" stroke="#fff" stroke-opacity="0.9" stroke-width="1.6"/>
+            </g>
+
             <path d="{{ $thumb }} C -38 -58, -46 -62, -48 -70 C -50 -76, -48 -80, -44 -84 Z" fill="#4a1f0a" fill-opacity="0.35" transform="translate(2 4)" filter="url(#fistBlur)"/>
             <path d="{{ $thumb }} C -38 -58, -46 -62, -48 -70 C -50 -76, -48 -80, -44 -84 Z" fill="url(#thumbGrad)"/>
             <path d="{{ $thumb }}" fill="none" stroke="#7a4426" stroke-width="1.7"/>
@@ -220,6 +249,18 @@
             <ellipse cx="16" cy="-78" rx="7" ry="4.6" transform="rotate(25 16 -78)" fill="url(#nailGrad)" stroke="#b07a58" stroke-width="1"/>
             <path d="M 10.5 -81 q -1.5 3.5 1 7" fill="none" stroke="#c98d6c" stroke-width="1"/>
             <ellipse cx="17" cy="-80" rx="3" ry="1.2" transform="rotate(25 17 -80)" fill="#fff" fill-opacity="0.8"/>
+
+            <g>
+                <animateTransform attributeName="transform" type="rotate" values="-6 -40 -88; 7 -40 -88; -6 -40 -88" dur="1.8s" repeatCount="indefinite"/>
+                <path d="M -44 -88 C -54 -84, -60 -76, -70 -66 L -65 -64 L -63 -58 C -56 -70, -48 -78, -38 -86 Z" fill="url(#tailGrad)" stroke="#a39d90" stroke-width="1"/>
+                <path d="M -45 -84 C -52 -80, -57 -74, -63 -66" fill="none" stroke="#d6d1c6" stroke-width="1"/>
+            </g>
+            <g>
+                <animateTransform attributeName="transform" type="rotate" values="5 -40 -88; -6 -40 -88; 5 -40 -88" dur="1.5s" repeatCount="indefinite"/>
+                <path d="M -42 -86 C -48 -78, -50 -70, -52 -58 L -48 -60 L -44 -56 C -44 -68, -40 -78, -36 -86 Z" fill="url(#tailGrad)" stroke="#a39d90" stroke-width="1"/>
+            </g>
+            <ellipse cx="-40" cy="-89" rx="7" ry="5.6" transform="rotate(-30 -40 -89)" fill="url(#tailGrad)" stroke="#a39d90" stroke-width="1"/>
+            <path d="M -44 -91 q 4 2 8 -1" fill="none" stroke="#c9c3b6" stroke-width="1"/>
         </g>
     </defs>
 

@@ -63,12 +63,20 @@
         <p>Сіз <b id="judgeTaps">0</b> рет бастыңыз</p>
     </section>
 
-    <section class="view view-result">
-        <div class="result-title" id="resultTitle"></div>
-        <p id="resultSub"></p>
-        <div class="my-taps"><span id="resultTaps">0</span><em>/ {{ $target }}</em><small id="resultTime">менің басуым · мои нажатия</small></div>
-        <p id="resultWinner" style="font-weight:800;font-size:1.1rem"></p>
-        <p class="waiting-dots" style="font-size:.9rem">Келесі ойынды күтіңіз · Ждите следующую игру</p>
+    <section class="view view-result" id="resultView">
+        @include('partials.bone-break')
+        <div class="winner-card" id="winnerCard">
+            <div class="crown">👑</div>
+            <div class="label" id="winnerLabel">Жеңімпаз · Победитель</div>
+            <div class="name" id="resultWinner"></div>
+            <div class="meta" id="resultWinnerMeta"></div>
+        </div>
+        <div class="after">
+            <div class="result-title" id="resultTitle"></div>
+            <p id="resultSub"></p>
+            <div class="my-taps"><span id="resultTaps">0</span><em>/ {{ $target }}</em><small id="resultTime">менің басуым · мои нажатия</small></div>
+            <p class="waiting-dots" style="font-size:.9rem">Келесі ойынды күтіңіз · Ждите следующую игру</p>
+        </div>
     </section>
 
     <section class="view view-full">

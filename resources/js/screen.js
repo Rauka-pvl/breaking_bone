@@ -4,10 +4,15 @@ import {
     isEchoConnected, onEchoState, phaseOf, unlockAudio,
 } from './common';
 import { createBone } from './bone';
+import { createMusic } from './music';
 
 const $ = (selector) => document.querySelector(selector);
 
 const clock = createClock();
+const music = createMusic(
+    { lobby: '/audio/argymak.mp3', game: '/audio/adai.mp3' },
+    { onChange: (muted) => $('#musicBtn')?.classList.toggle('off', muted) },
+);
 const bone = createBone({
     wrap: $('#bone'),
     canvas: $('#fx'),
@@ -56,7 +61,7 @@ QRCode.toDataURL(config.joinUrl, {
     els.qr.querySelector('img').src = src;
 });
 
-const target = () => state?.targetTaps ?? 100;
+const target = () => state?.targetTaps ?? 150;
 
 function setStatus(text) {
     els.status.textContent = text;
@@ -182,6 +187,8 @@ function onPhase(phase) {
     els.qr.classList.toggle('dim', phase !== 'lobby' && phase !== 'finished');
     setButtons(phase);
     bone.grip(phase !== 'lobby');
+
+    music.play(phase === 'lobby' ? 'lobby' : 'game', { restart: phase === 'countdown' });
 
     switch (phase) {
         case 'lobby':
@@ -337,5 +344,14 @@ els.startBtn?.addEventListener('click', () => {
 els.resetBtn?.addEventListener('click', () => hostAction('/reset'));
 
 document.addEventListener('pointerdown', unlockAudio, { once: true });
+for (const type of ['pointerdown', 'keydown']) {
+    document.addEventListener(type, (e) => {
+        if (!e.target.closest?.('#musicBtn')) music.unlock();
+    });
+}
+
+const musicBtn = $('#musicBtn');
+musicBtn?.classList.toggle('off', music.muted);
+musicBtn?.addEventListener('click', () => music.toggle());
 
 poll();
