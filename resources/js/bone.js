@@ -1,6 +1,6 @@
 const VIEW_W = 600;
-const VIEW_TOP = -50;
-const VIEW_H = 270;
+const VIEW_TOP = -70;
+const VIEW_H = 290;
 const CENTER_Y = 110;
 const BONE_TOP = 93;
 const GRAVITY = 1500;
@@ -14,7 +14,7 @@ const RECOIL = 210;
 const STRIKE_MS = WINDUP + SLAM + HOLD + RECOIL;
 const STRIKE_GAP = 420;
 const FIST_LIFT = 28;
-const FIST_CONTACT = 37;
+const FIST_CONTACT = 41;
 const FINAL_WINDUP = 150;
 const FINAL_SLAM = 60;
 
@@ -37,6 +37,7 @@ export function createBone({ wrap, canvas, onImpact = () => {} }) {
     const rays = wrap.querySelector('.bone-rays');
     const halo = wrap.querySelector('.bone-halo');
     const fist = wrap.querySelector('.fist');
+    const trail = wrap.querySelector('.fist-trail');
     const edges = [...wrap.querySelectorAll('.edge')];
     const stress = [...wrap.querySelectorAll('.stress')];
     const sheens = [...wrap.querySelectorAll('.sheen')];
@@ -347,13 +348,17 @@ export function createBone({ wrap, canvas, onImpact = () => {} }) {
         let dy = Math.sin(time * 2.6) * 3;
         let rot = 0;
         let opacity = clamp(g * 1.6);
+        let streak = 0;
+        let falling = false;
 
         if (brokenAt) {
             const st = (t - brokenAt) / 1000 - HIT_STOP;
             if (st < 0) {
                 dy = FIST_CONTACT;
+                streak = 1;
             } else if (st < 0.14) {
                 dy = lerp(FIST_CONTACT, FIST_CONTACT + 45, easeOutCubic(st / 0.14));
+                streak = 1 - st / 0.14;
             } else {
                 dy = lerp(FIST_CONTACT + 45, -70, easeInOutSine(clamp((st - 0.14) / 0.85)));
                 rot = -6 * clamp((st - 0.14) / 0.5);
@@ -369,6 +374,8 @@ export function createBone({ wrap, canvas, onImpact = () => {} }) {
                 const p = clamp((s - FINAL_WINDUP) / FINAL_SLAM);
                 dy = lerp(-FIST_LIFT * 1.5, FIST_CONTACT, p * p);
                 rot = lerp(-14, 4, p);
+                streak = clamp(p * 1.4);
+                falling = true;
             }
         } else if (strikeAt !== null) {
             const s = t - strikeAt;
@@ -378,19 +385,29 @@ export function createBone({ wrap, canvas, onImpact = () => {} }) {
             }
             if (s >= STRIKE_MS) strikeAt = null;
             ({ dy, rot } = strikePose(Math.min(s, STRIKE_MS)));
+            if (s >= WINDUP && s < WINDUP + SLAM) {
+                streak = (s - WINDUP) / SLAM;
+                falling = true;
+            } else if (s >= WINDUP + SLAM) {
+                streak = 1 - clamp((s - WINDUP - SLAM) / 90);
+            }
         }
 
         let sx = 1;
         let sy = 1;
-        if (impactAt !== null && !brokenAt) {
+        if (falling) {
+            sx = 1 - 0.04 * streak;
+            sy = 1 + 0.07 * streak;
+        } else if (impactAt !== null && !brokenAt) {
             const q = 1 - clamp((t - impactAt) / 90);
             sx = 1 + 0.07 * q;
             sy = 1 - 0.09 * q;
         }
 
-        dy -= 190 * (1 - g);
+        dy -= 200 * (1 - g);
         fist.style.transform = `translate(0px, ${dy.toFixed(2)}px) rotate(${rot.toFixed(2)}deg) scale(${sx.toFixed(3)}, ${sy.toFixed(3)})`;
         fist.style.opacity = opacity.toFixed(3);
+        trail.setAttribute('opacity', (streak * 0.85).toFixed(3));
         return clamp(g);
     }
 
