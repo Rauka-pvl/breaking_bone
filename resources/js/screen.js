@@ -1,7 +1,7 @@
 import QRCode from 'qrcode';
 import {
-    api, beep, config, crackSound, createClock, createEcho, escapeHtml,
-    isEchoConnected, onEchoState, phaseOf, SIDES, unlockAudio,
+    api, beep, config, crackSound, createClock, createEcho, escapeHtml, formatSeconds,
+    isEchoConnected, onEchoState, phaseOf, unlockAudio,
 } from './common';
 import { createBone } from './bone';
 
@@ -14,32 +14,28 @@ const els = {
     stage: $('#stage'),
     timer: $('#timer'),
     status: $('#status'),
-    tugFill: $('#tugFill'),
+    qr: $('#qr'),
+    playerCount: $('#playerCount'),
+    maxPlayers: $('#maxPlayers'),
+    names: $('#names'),
+    board: $('#board'),
+    raceFill: $('#raceFill'),
+    raceLabel: $('#raceLabel'),
     countdown: $('#countdown'),
     countNum: $('#countNum'),
     result: $('#result'),
     winnerName: $('#winnerName'),
-    finalScore: $('#finalScore'),
-    topPlayers: $('#topPlayers'),
+    winnerTime: $('#winnerTime'),
+    podium: $('#podium'),
     flash: $('#flash'),
     conn: $('#conn'),
     startBtn: $('#startBtn'),
     resetBtn: $('#resetBtn'),
 };
-const teams = Object.fromEntries(['left', 'right'].map((side) => {
-    const root = $(`#team-${side}`);
-    return [side, {
-        root,
-        qr: root.querySelector('.qr'),
-        count: root.querySelector('[data-count]'),
-        max: root.querySelector('[data-max]'),
-        score: root.querySelector('[data-score]'),
-        names: root.querySelector('[data-names]'),
-    }];
-}));
 
 let state = null;
-let scores = { left: 0, right: 0 };
+let leaderTaps = 0;
+let tapSum = 0;
 let renderedKey = null;
 let lastCount = null;
 let lastScoreAt = 0;
@@ -47,49 +43,60 @@ let polling = false;
 let finishing = false;
 let goShownFor = null;
 
-for (const side of ['left', 'right']) {
-    QRCode.toDataURL(config.joinUrls[side], {
-        width: 640,
-        margin: 1,
-        errorCorrectionLevel: 'M',
-        color: { dark: '#08142b', light: '#ffffff' },
-    }).then((src) => {
-        teams[side].qr.querySelector('img').src = src;
-    });
-}
+QRCode.toDataURL(config.joinUrl, {
+    width: 720,
+    margin: 1,
+    errorCorrectionLevel: 'M',
+    color: { dark: '#08142b', light: '#ffffff' },
+}).then((src) => {
+    els.qr.querySelector('img').src = src;
+});
+
+const target = () => state?.targetTaps ?? 100;
 
 function setStatus(text) {
     els.status.textContent = text;
 }
 
-function renderPlayers(players, max) {
-    for (const side of ['left', 'right']) {
-        teams[side].count.textContent = players?.[side] ?? 0;
-        if (max) teams[side].max.textContent = max;
-    }
+function renderPlayers(count, max) {
+    els.playerCount.textContent = count ?? 0;
+    if (max) els.maxPlayers.textContent = max;
 }
 
-function addName(side, name) {
-    const list = teams[side]?.names;
-    if (!list || !name) return;
+function addName(name) {
+    if (!name) return;
     const li = document.createElement('li');
     li.textContent = name;
-    list.prepend(li);
-    while (list.children.length > 14) list.lastElementChild.remove();
+    els.names.prepend(li);
+    while (els.names.children.length > 24) els.names.lastElementChild.remove();
 }
 
-function setScores(next, { animate = true } = {}) {
-    const delta = Math.max(0, next.left - scores.left) + Math.max(0, next.right - scores.right);
-    scores = { left: next.left, right: next.right };
+function renderLeaders(leaders, { animate = true } = {}) {
+    const list = leaders ?? [];
+    const goal = target();
 
-    teams.left.score.textContent = scores.left;
-    teams.right.score.textContent = scores.right;
+    els.board.innerHTML = list.map((p) => {
+        const done = p.timeMs !== null;
+        const pct = Math.min(100, (p.taps / goal) * 100);
+        return `<li class="${done ? 'done' : ''}">
+            <span class="place">${p.place}</span>
+            <span class="who"><b>${escapeHtml(p.name)}</b><i style="width:${pct}%"></i></span>
+            <span class="taps">${done ? formatSeconds(p.timeMs) : p.taps}</span>
+        </li>`;
+    }).join('');
 
-    const total = scores.left + scores.right;
-    els.tugFill.style.width = `${total ? (scores.left / total) * 100 : 50}%`;
-    bone.setBalance(total ? (scores.right - scores.left) / total : 0);
+    const leader = list[0];
+    const top = leader?.taps ?? 0;
+    const sum = list.reduce((acc, p) => acc + p.taps, 0);
 
-    if (animate) bone.hit(delta);
+    els.raceFill.style.width = `${Math.min(100, (top / goal) * 100)}%`;
+    els.raceLabel.innerHTML = leader
+        ? `Көшбасшы · Лидер: <b>${escapeHtml(leader.name)}</b> — ${top} / ${goal}`
+        : `Бірінші ${goal} басқан жеңеді · Первый до ${goal} побеждает`;
+
+    if (animate && sum > tapSum) bone.hit(sum - tapSum);
+    tapSum = sum;
+    leaderTaps = top;
 }
 
 function applyState(next) {
@@ -100,20 +107,13 @@ function applyState(next) {
     state = newGame ? { ...next } : { ...state, ...next };
 
     if (newGame) {
-        teams.left.names.innerHTML = '';
-        teams.right.names.innerHTML = '';
-        setScores({ left: 0, right: 0 }, { animate: false });
+        els.names.innerHTML = '';
+        tapSum = 0;
+        leaderTaps = 0;
     }
 
-    renderPlayers(state.players, state.maxPerSide);
-
-    if (next.scores) {
-        const final = state.status === 'finished';
-        setScores(final ? next.scores : {
-            left: Math.max(scores.left, next.scores.left),
-            right: Math.max(scores.right, next.scores.right),
-        }, { animate: !newGame && !final });
-    }
+    renderPlayers(state.players, state.maxPlayers);
+    if (next.leaders || newGame) renderLeaders(next.leaders ?? [], { animate: !newGame && state.status === 'playing' });
 
     tick();
 }
@@ -140,9 +140,8 @@ function setButtons(phase) {
 }
 
 function showResult() {
-    const winner = state.winner;
     if (!bone.isBroken()) {
-        bone.breakBone(winner);
+        bone.breakBone();
         crackSound();
         els.flash.classList.remove('go');
         void els.flash.offsetWidth;
@@ -152,22 +151,18 @@ function showResult() {
         els.screen.classList.add('quake');
     }
 
-    const final = state.scores ?? scores;
-    setScores(final, { animate: false });
+    const winner = state.winner;
+    els.winnerName.textContent = winner ? winner.name : 'Жеңімпаз жоқ · Нет победителя';
+    els.winnerTime.textContent = winner
+        ? (winner.timeMs !== null ? `${winner.taps} басу · ${formatSeconds(winner.timeMs)}` : `${winner.taps} басу · нажатий`)
+        : '';
 
-    teams.left.root.classList.toggle('winner', winner === 'left');
-    teams.right.root.classList.toggle('winner', winner === 'right');
-
-    els.winnerName.innerHTML = winner === 'draw'
-        ? 'Тең түсті! · <span style="opacity:.8">Ничья</span>'
-        : `<span style="color:${SIDES[winner].color}">${SIDES[winner].kk} жеңді!</span> · <span style="opacity:.8">Победили ${SIDES[winner].ru.toLowerCase()}</span>`;
-    els.finalScore.innerHTML = `<span style="color:${SIDES.left.color}">${final.left}</span> : <span style="color:${SIDES.right.color}">${final.right}</span>`;
-
-    const top = state.top;
-    els.topPlayers.innerHTML = top ? ['left', 'right'].map((side) => `
-        <div><b style="color:${SIDES[side].color}">${SIDES[side].kk}</b>
-            <ol>${(top[side] ?? []).map((p) => `<li>${escapeHtml(p.name)} — ${p.taps}</li>`).join('')}</ol>
-        </div>`).join('') : '';
+    els.podium.innerHTML = (state.leaders ?? []).slice(0, 3).map((p) => `
+        <li class="p${p.place}">
+            <span class="medal">${p.place}</span>
+            <b>${escapeHtml(p.name)}</b>
+            <small>${p.timeMs !== null ? formatSeconds(p.timeMs) : `${p.taps} басу`}</small>
+        </li>`).join('');
 
     setTimeout(() => {
         if (state.status === 'finished') els.result.classList.add('show');
@@ -179,38 +174,32 @@ function showResult() {
 function onPhase(phase) {
     els.result.classList.toggle('show', false);
     els.stage.classList.toggle('finished', phase === 'finished');
+    els.qr.classList.toggle('dim', phase !== 'lobby' && phase !== 'finished');
     setButtons(phase);
-
-    if (phase !== 'finished') {
-        teams.left.root.classList.remove('winner');
-        teams.right.root.classList.remove('winner');
-    }
-
-    const dimQr = phase !== 'lobby' && phase !== 'finished';
-    teams.left.qr.classList.toggle('dim', dimQr);
-    teams.right.qr.classList.toggle('dim', dimQr);
 
     switch (phase) {
         case 'lobby':
             bone.reset();
             hideCount();
+            renderLeaders([], { animate: false });
             els.timer.classList.remove('hurry');
-            els.timer.textContent = `${(state?.roundSeconds ?? 10).toFixed(1)}`;
-            setStatus('QR-ды сканерлеп, жағыңды таңда · Сканируйте QR и выберите сторону');
+            els.timer.textContent = '0.0';
+            setStatus('QR-ды сканерлеңіз · Сканируйте QR');
             break;
         case 'countdown':
             bone.reset();
             lastCount = null;
+            els.timer.textContent = '0.0';
             setStatus('Дайындалыңыз! · Приготовьтесь!');
             break;
         case 'playing':
-            setStatus('Бас! Бас! Бас! · Жми быстрее!');
+            setStatus(`Бас! ${target()} рет! · Жми ${target()} раз!`);
             break;
         case 'judging':
             hideCount();
-            els.timer.textContent = '0.0';
             els.timer.classList.remove('hurry');
-            setStatus('Санап жатырмыз… · Считаем…');
+            els.timer.textContent = ((state.endsAt - state.startsAt) / 1000).toFixed(1);
+            setStatus(leaderTaps >= target() ? 'Бар! Тексеріп жатырмыз… · Есть! Проверяем…' : 'Уақыт бітті! · Время вышло!');
             break;
         case 'finished':
             hideCount();
@@ -259,23 +248,24 @@ function tick() {
         if (secs !== lastCount && secs > 0) {
             lastCount = secs;
             showCount(String(secs));
+            bone.pulse();
             beep(520, 0.15);
         }
-        els.timer.textContent = `${state.roundSeconds.toFixed(1)}`;
     }
 
     if (phase === 'playing') {
         if (goShownFor !== state.gameId) {
             goShownFor = state.gameId;
             showCount('СЫНДЫР!', true);
+            bone.pulse();
             beep(880, 0.35, 0.3);
             setTimeout(hideCount, 800);
         }
 
         const remaining = Math.max(0, (state.endsAt - now) / 1000);
-        els.timer.textContent = remaining.toFixed(1);
-        els.timer.classList.toggle('hurry', remaining <= 3);
-        bone.setProgress(1 - remaining / state.roundSeconds);
+        els.timer.textContent = Math.max(0, (now - state.startsAt) / 1000).toFixed(1);
+        els.timer.classList.toggle('hurry', remaining <= 5);
+        bone.setProgress(leaderTaps / target());
 
         if (now - lastScoreAt > 1200) {
             lastScoreAt = now;
@@ -297,22 +287,20 @@ if (echo) {
         if (!state || e.gameId !== state.gameId) return;
         state.players = e.players;
         renderPlayers(e.players);
-        if (e.lastJoined) addName(e.lastJoined.side, e.lastJoined.name);
+        if (e.lastJoined) addName(e.lastJoined.name);
     });
     channel.listen('.game.started', (e) => applyState(e));
     channel.listen('.score.updated', (e) => {
-        if (!state || e.gameId !== state.gameId) return;
+        if (!state || e.gameId !== state.gameId || state.status !== 'playing') return;
         lastScoreAt = clock.now();
-        setScores({
-            left: Math.max(scores.left, e.scores.left),
-            right: Math.max(scores.right, e.scores.right),
-        });
+        state.leaders = e.leaders;
+        renderLeaders(e.leaders);
     });
+    channel.listen('.round.stopped', (e) => applyState(e));
     channel.listen('.game.finished', (e) => applyState(e));
     channel.listen('.game.reset', (e) => applyState(e));
 
-    const setConn = (s) => els.conn.classList.toggle('ok', s === 'connected');
-    onEchoState(echo, setConn);
+    onEchoState(echo, (s) => els.conn.classList.toggle('ok', s === 'connected'));
 }
 
 setInterval(() => {

@@ -7,7 +7,6 @@ use App\Services\GameService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 use RuntimeException;
 
@@ -31,10 +30,7 @@ class GameController extends Controller
 
         return view('screen', [
             'room' => $room,
-            'joinUrls' => [
-                'left' => url("/play/{$room->code}/left"),
-                'right' => url("/play/{$room->code}/right"),
-            ],
+            'joinUrl' => url("/play/{$room->code}"),
             'config' => $this->clientConfig($room) + ['hostKey' => $room->key],
         ]);
     }
@@ -53,27 +49,23 @@ class GameController extends Controller
         return redirect('/');
     }
 
-    public function play(HostKey $room, string $side): View
+    public function play(HostKey $room): View
     {
         abort_unless($room->active, 404);
-        abort_unless(in_array($side, config('zhilik.sides'), true), 404);
 
-        return view('play', [
-            'side' => $side,
-            'config' => $this->clientConfig($room) + [
-                'playUrls' => [
-                    'left' => url("/play/{$room->code}/left"),
-                    'right' => url("/play/{$room->code}/right"),
-                ],
-            ],
-        ]);
+        return view('play', ['config' => $this->clientConfig($room)]);
     }
 
-    public function state(HostKey $room): JsonResponse
+    public function state(Request $request, HostKey $room): JsonResponse
     {
         $this->ensureActive($room);
 
-        return response()->json($this->games->state($this->games->currentFresh($room)));
+        $clientId = $request->query('clientId');
+
+        return response()->json($this->games->state(
+            $this->games->currentFresh($room),
+            is_string($clientId) && $clientId !== '' ? mb_substr($clientId, 0, 64) : null,
+        ));
     }
 
     public function join(Request $request, HostKey $room): JsonResponse
@@ -82,7 +74,6 @@ class GameController extends Controller
 
         $data = $request->validate([
             'clientId' => ['required', 'string', 'max:64'],
-            'side' => ['required', Rule::in(config('zhilik.sides'))],
             'name' => ['nullable', 'string', 'max:40'],
         ]);
 
@@ -90,16 +81,16 @@ class GameController extends Controller
 
         try {
             return response()->json(
-                $this->games->join($room, $data['clientId'], $data['side'], $name !== '' ? $name : null)
+                $this->games->join($room, $data['clientId'], $name !== '' ? $name : null)
             );
         } catch (RuntimeException $e) {
-            if ($e->getMessage() !== 'side_full') {
+            if ($e->getMessage() !== 'game_full') {
                 throw $e;
             }
 
             return response()->json([
-                'error' => 'side_full',
-                'message' => 'Бұл жақта орын жоқ / На этой стороне нет мест',
+                'error' => 'game_full',
+                'message' => 'Орын жоқ / Мест нет',
             ], 409);
         }
     }
@@ -124,9 +115,15 @@ class GameController extends Controller
         $data = $request->validate([
             'clientId' => ['required', 'string', 'max:64'],
             'taps' => ['required', 'integer', 'min:0', 'max:100000'],
+            'reachedAt' => ['nullable', 'integer', 'min:0'],
         ]);
 
-        return response()->json($this->games->recordTaps($room, $data['clientId'], (int) $data['taps']));
+        return response()->json($this->games->recordTaps(
+            $room,
+            $data['clientId'],
+            (int) $data['taps'],
+            isset($data['reachedAt']) ? (int) $data['reachedAt'] : null,
+        ));
     }
 
     public function start(Request $request, HostKey $room): JsonResponse
@@ -140,14 +137,7 @@ class GameController extends Controller
     {
         $this->ensureActive($room);
 
-        $game = $this->games->finish($room);
-        $state = $this->games->state($game);
-
-        if ($game->isFinished()) {
-            $state['top'] = $this->games->topPlayers($game);
-        }
-
-        return response()->json($state);
+        return response()->json($this->games->state($this->games->finish($room)));
     }
 
     public function reset(Request $request, HostKey $room): JsonResponse

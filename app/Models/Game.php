@@ -19,9 +19,7 @@ class Game extends Model
         'status',
         'starts_at_ms',
         'ends_at_ms',
-        'left_taps',
-        'right_taps',
-        'winner',
+        'winner_player_id',
     ];
 
     protected function casts(): array
@@ -29,8 +27,7 @@ class Game extends Model
         return [
             'starts_at_ms' => 'integer',
             'ends_at_ms' => 'integer',
-            'left_taps' => 'integer',
-            'right_taps' => 'integer',
+            'winner_player_id' => 'integer',
         ];
     }
 

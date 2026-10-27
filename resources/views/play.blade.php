@@ -1,21 +1,18 @@
-@php
-    $teamNames = ['left' => ['Көк жақ', 'Синие'], 'right' => ['Қызыл жақ', 'Красные']];
-    [$kk, $ru] = $teamNames[$side];
-@endphp
+@php($target = config('zhilik.target_taps'))
 
 @extends('layouts.app', [
     'entry' => 'resources/js/play.js',
-    'zhilik' => $config + ['side' => $side],
+    'zhilik' => $config,
 ])
 
-@section('title', "Жілік сындыру — {$kk}")
+@section('title', 'Жілік сындыру')
 @section('bodyClass', 'zh-bg')
 
 @section('content')
-<div class="play side-{{ $side }}" id="play" data-view="join">
+<div class="play" id="play" data-view="join">
     <header class="team-bar">
-        <h1>{{ $kk }}</h1>
-        <p>{{ $ru }} · Жілік сындыру</p>
+        <h1>Жілік сындыру</h1>
+        <p>Бірінші {{ $target }} рет бас · Первым нажми {{ $target }} раз</p>
     </header>
 
     <section class="view view-join">
@@ -34,7 +31,7 @@
         <h2 id="helloName">Сәлем!</h2>
         <p class="waiting-dots">Ойын басталуын күтіңіз · Ждите начала игры</p>
         <p id="waitCounts"></p>
-        <p style="font-size:.9rem">Ойын басталғанда 10 секунд ішінде батырманы мүмкіндігінше көп басыңыз!<br>Когда игра начнётся — жмите кнопку как можно чаще 10 секунд!</p>
+        <p style="font-size:.9rem">Ойын басталғанда батырманы {{ $target }} рет бірінші болып басыңыз!<br>Когда игра начнётся — первым нажмите кнопку {{ $target }} раз!</p>
     </section>
 
     <section class="view view-countdown">
@@ -43,36 +40,40 @@
     </section>
 
     <section class="view view-tap">
-        <div class="tap-meta"><span id="tapTeam">{{ $kk }}</span><span class="time" id="tapTime">10.0</span></div>
+        <div class="tap-meta"><span id="leaderInfo"></span><span class="time" id="tapTime">0.0</span></div>
         <button class="tap-btn" id="tapBtn" type="button">
             @include('partials.bone-icon', ['id' => 'boneTap'])
             <span>Бас!</span>
         </button>
-        <div class="my-taps"><span id="myTaps">0</span><small>менің басуым · мои нажатия</small></div>
-        <div class="team-mini">
-            <div class="tug"><div class="fill" id="miniFill"></div><div class="mid"></div></div>
-            <div class="nums"><span id="miniLeft" style="color:#7fb0ff">0</span><span id="miniRight" style="color:#ff8a8c">0</span></div>
-        </div>
+        <div class="my-taps"><span id="myTaps">0</span><em>/ {{ $target }}</em><small>менің басуым · мои нажатия</small></div>
+        <div class="my-progress"><i id="myProgress"></i></div>
+    </section>
+
+    <section class="view view-done">
+        <div class="result-title win">{{ $target }}!</div>
+        <p>Тамаша! · Отлично!</p>
+        <p>Сіздің уақытыңыз · Ваше время: <b id="doneTime"></b></p>
+        <p class="waiting-dots">Нәтижені күтіңіз · Ждём результат</p>
     </section>
 
     <section class="view view-judging">
         @include('partials.bone-icon', ['id' => 'boneJudge', 'class' => 'mini-bone'])
-        <h2 class="waiting-dots">Санап жатырмыз</h2>
-        <p>Считаем результаты · Экранға қараңыз!</p>
+        <h2 class="waiting-dots">Ойын аяқталды</h2>
+        <p>Игра окончена · Экранға қараңыз!</p>
         <p>Сіз <b id="judgeTaps">0</b> рет бастыңыз</p>
     </section>
 
     <section class="view view-result">
         <div class="result-title" id="resultTitle"></div>
         <p id="resultSub"></p>
-        <div class="my-taps"><span id="resultTaps">0</span><small>менің басуым · мои нажатия</small></div>
-        <p id="resultScore" style="font-weight:800;font-size:1.3rem"></p>
+        <div class="my-taps"><span id="resultTaps">0</span><em>/ {{ $target }}</em><small id="resultTime">менің басуым · мои нажатия</small></div>
+        <p id="resultWinner" style="font-weight:800;font-size:1.1rem"></p>
         <p class="waiting-dots" style="font-size:.9rem">Келесі ойынды күтіңіз · Ждите следующую игру</p>
     </section>
 
     <section class="view view-full">
         <h2>Орын жоқ</h2>
-        <p>Бұл жақта {{ config('zhilik.max_per_side') }} ойыншы бар.<br>На этой стороне уже {{ config('zhilik.max_per_side') }} игроков.</p>
+        <p>Ойында {{ config('zhilik.max_players') }} ойыншы бар.<br>В игре уже {{ config('zhilik.max_players') }} игроков.</p>
         <button class="zh-btn ghost" id="retryBtn" type="button">Қайталау · Повторить</button>
     </section>
 </div>

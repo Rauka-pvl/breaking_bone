@@ -10,15 +10,16 @@ class Player extends Model
     protected $fillable = [
         'game_id',
         'client_id',
-        'side',
         'name',
         'taps',
+        'reached_ms',
     ];
 
     protected function casts(): array
     {
         return [
             'taps' => 'integer',
+            'reached_ms' => 'integer',
         ];
     }
 

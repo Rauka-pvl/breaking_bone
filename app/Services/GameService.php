@@ -6,11 +6,13 @@ use App\Events\GameFinished;
 use App\Events\GameReset;
 use App\Events\GameStarted;
 use App\Events\PlayersUpdated;
+use App\Events\RoundStopped;
 use App\Events\ScoreUpdated;
 use App\Events\ZhilikEvent;
 use App\Models\Game;
 use App\Models\HostKey;
 use App\Models\Player;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
@@ -38,39 +40,41 @@ class GameService
         return $game;
     }
 
-    public function state(Game $game): array
+    public function state(Game $game, ?string $clientId = null): array
     {
-        $counts = $this->playerCounts($game);
-        $scores = $game->isFinished()
-            ? ['left' => $game->left_taps, 'right' => $game->right_taps]
-            : $this->tapTotals($game);
-
-        return [
+        $state = [
             'gameId' => $game->id,
             'status' => $game->status,
             'phase' => $this->phase($game),
             'startsAt' => $game->starts_at_ms,
             'endsAt' => $game->ends_at_ms,
             'serverNow' => $this->nowMs(),
-            'players' => $counts,
-            'scores' => $scores,
-            'winner' => $game->winner,
-            'maxPerSide' => config('zhilik.max_per_side'),
-            'roundSeconds' => config('zhilik.round_seconds'),
+            'players' => $this->playerCount($game),
+            'leaders' => $this->leaders($game),
+            'winner' => $game->isFinished() ? $this->winnerPayload($game) : null,
+            'maxPlayers' => config('zhilik.max_players'),
+            'targetTaps' => config('zhilik.target_taps'),
+            'maxSeconds' => config('zhilik.max_seconds'),
             'tapSyncMs' => config('zhilik.tap_sync_ms'),
             'graceMs' => config('zhilik.grace_seconds') * 1000,
         ];
+
+        if ($clientId !== null) {
+            $state['me'] = $this->mePayload($game, $clientId);
+        }
+
+        return $state;
     }
 
     /**
-     * @throws RuntimeException when the side is full
+     * @throws RuntimeException when the game is full
      */
-    public function join(HostKey $room, string $clientId, string $side, ?string $name): array
+    public function join(HostKey $room, string $clientId, ?string $name): array
     {
         $game = $this->currentFresh($room);
-        $max = (int) config('zhilik.max_per_side');
+        $max = (int) config('zhilik.max_players');
 
-        $player = DB::transaction(function () use ($game, $clientId, $side, $name, $max) {
+        $player = DB::transaction(function () use ($game, $clientId, $name, $max) {
             Game::query()->whereKey($game->id)->lockForUpdate()->first();
 
             $player = Player::query()
@@ -78,7 +82,7 @@ class GameService
                 ->where('client_id', $clientId)
                 ->first();
 
-            if ($player && $player->side === $side) {
+            if ($player) {
                 if ($name !== null && $name !== $player->name) {
                     $player->update(['name' => $name]);
                 }
@@ -86,43 +90,29 @@ class GameService
                 return $player;
             }
 
-            if ($player && ! $game->isLobby()) {
-                return $player;
-            }
-
-            $taken = Player::query()
-                ->where('game_id', $game->id)
-                ->where('side', $side)
-                ->count();
+            $taken = Player::query()->where('game_id', $game->id)->count();
 
             if ($taken >= $max) {
-                throw new RuntimeException('side_full');
-            }
-
-            if ($player) {
-                $player->update(['side' => $side, 'name' => $name ?? $player->name]);
-
-                return $player;
+                throw new RuntimeException('game_full');
             }
 
             return Player::query()->create([
                 'game_id' => $game->id,
                 'client_id' => $clientId,
-                'side' => $side,
                 'name' => $name ?: 'Ойыншы #'.($taken + 1),
             ]);
         });
 
-        if ($player->wasRecentlyCreated || $player->wasChanged('side')) {
+        if ($player->wasRecentlyCreated) {
             $this->broadcast(new PlayersUpdated($room->channel(), [
                 'gameId' => $game->id,
-                'players' => $this->playerCounts($game),
-                'lastJoined' => ['name' => $player->name, 'side' => $player->side],
+                'players' => $this->playerCount($game),
+                'lastJoined' => ['name' => $player->name],
             ]));
         }
 
         return [
-            'player' => $this->playerPayload($player),
+            'player' => ['name' => $player->name, 'taps' => (int) $player->taps],
             'state' => $this->state($game),
         ];
     }
@@ -143,7 +133,7 @@ class GameService
         if ($deleted) {
             $this->broadcast(new PlayersUpdated($room->channel(), [
                 'gameId' => $game->id,
-                'players' => $this->playerCounts($game),
+                'players' => $this->playerCount($game),
                 'lastJoined' => null,
             ]));
         }
@@ -166,7 +156,8 @@ class GameService
         $game->update([
             'status' => Game::PLAYING,
             'starts_at_ms' => $startsAt,
-            'ends_at_ms' => $startsAt + config('zhilik.round_seconds') * 1000,
+            'ends_at_ms' => $startsAt + config('zhilik.max_seconds') * 1000,
+            'winner_player_id' => null,
         ]);
 
         $room->forceFill(['last_used_at' => now()])->save();
@@ -177,11 +168,13 @@ class GameService
     }
 
     /**
-     * Stores the player's cumulative tap count for the running round.
+     * Stores the player's cumulative tap count. Reaching the target records the
+     * finish time and stops the round for everyone.
      *
-     * @return array{accepted: bool, taps: int, reason?: string}
+     * @param  int|null  $reachedAt  server-clock ms when the phone registered the target tap
+     * @return array{accepted: bool, taps: int, reached?: bool, reason?: string}
      */
-    public function recordTaps(HostKey $room, string $clientId, int $taps): array
+    public function recordTaps(HostKey $room, string $clientId, int $taps, ?int $reachedAt = null): array
     {
         $game = $this->current($room);
         $now = $this->nowMs();
@@ -194,7 +187,7 @@ class GameService
             return ['accepted' => false, 'taps' => 0, 'reason' => 'not_started'];
         }
 
-        if ($now > $game->ends_at_ms + config('zhilik.grace_seconds') * 1000) {
+        if ($now > $this->finishAllowedAtMs($game)) {
             return ['accepted' => false, 'taps' => 0, 'reason' => 'round_over'];
         }
 
@@ -207,20 +200,39 @@ class GameService
             return ['accepted' => false, 'taps' => 0, 'reason' => 'not_joined'];
         }
 
+        $target = (int) config('zhilik.target_taps');
+        $maxRate = (int) config('zhilik.max_taps_per_second');
         $elapsedSeconds = (min($now, $game->ends_at_ms) - $game->starts_at_ms) / 1000;
-        $cap = (int) ceil($elapsedSeconds * config('zhilik.max_taps_per_second')) + 5;
-        $value = max(0, min($taps, $cap));
+        $cap = (int) ceil($elapsedSeconds * $maxRate) + 5;
+        $value = max(0, min($taps, $cap, $target));
 
         if ($value > $player->taps) {
             Player::query()
                 ->whereKey($player->id)
                 ->where('taps', '<', $value)
                 ->update(['taps' => $value, 'updated_at' => now()]);
+        }
 
+        $reached = $player->reached_ms !== null;
+
+        if ($value >= $target && ! $reached) {
+            $earliest = $game->starts_at_ms + (int) ceil(max(0, $target - 5) / $maxRate * 1000);
+            $reachedMs = max($earliest, min($reachedAt ?? $now, $now));
+
+            Player::query()
+                ->whereKey($player->id)
+                ->whereNull('reached_ms')
+                ->update(['reached_ms' => $reachedMs]);
+
+            $reached = true;
+            $this->stopRound($room, $game, $now);
+        }
+
+        if ($value > $player->taps) {
             $this->maybeBroadcastScore($room, $game);
         }
 
-        return ['accepted' => true, 'taps' => max($value, $player->taps)];
+        return ['accepted' => true, 'taps' => max($value, (int) $player->taps), 'reached' => $reached];
     }
 
     public function finish(HostKey $room, ?Game $game = null): Game
@@ -231,30 +243,21 @@ class GameService
             return $game;
         }
 
-        $totals = $this->tapTotals($game);
-        $winner = match (true) {
-            $totals['left'] > $totals['right'] => 'left',
-            $totals['right'] > $totals['left'] => 'right',
-            default => 'draw',
-        };
+        $winner = $this->ranked($game)->where('taps', '>', 0)->first();
 
         $updated = Game::query()
             ->whereKey($game->id)
             ->where('status', Game::PLAYING)
             ->update([
                 'status' => Game::FINISHED,
-                'left_taps' => $totals['left'],
-                'right_taps' => $totals['right'],
-                'winner' => $winner,
+                'winner_player_id' => $winner?->id,
                 'updated_at' => now(),
             ]);
 
         $game->refresh();
 
         if ($updated) {
-            $state = $this->state($game);
-            $state['top'] = $this->topPlayers($game);
-            $this->broadcast(new GameFinished($room->channel(), $state));
+            $this->broadcast(new GameFinished($room->channel(), $this->state($game)));
         }
 
         return $game;
@@ -280,11 +283,10 @@ class GameService
         return DB::transaction(function () use ($room, $previous) {
             $game = Game::query()->create(['host_key_id' => $room->id, 'status' => Game::LOBBY]);
 
-            $previous->players()->get(['client_id', 'side', 'name'])
+            $previous->players()->get(['client_id', 'name'])
                 ->each(fn (Player $player) => Player::query()->create([
                     'game_id' => $game->id,
                     'client_id' => $player->client_id,
-                    'side' => $player->side,
                     'name' => $player->name,
                 ]));
 
@@ -292,31 +294,86 @@ class GameService
         });
     }
 
-    public function topPlayers(Game $game, int $limit = 3): array
+    /**
+     * Moves the round end to now so phones stop tapping; finish() runs after the grace period.
+     */
+    private function stopRound(HostKey $room, Game $game, int $now): void
     {
-        $top = [];
+        $stopped = Game::query()
+            ->whereKey($game->id)
+            ->where('status', Game::PLAYING)
+            ->where('ends_at_ms', '>', $now)
+            ->update(['ends_at_ms' => $now, 'updated_at' => now()]);
 
-        foreach (config('zhilik.sides') as $side) {
-            $top[$side] = Player::query()
-                ->where('game_id', $game->id)
-                ->where('side', $side)
-                ->where('taps', '>', 0)
-                ->orderByDesc('taps')
-                ->limit($limit)
-                ->get(['name', 'taps'])
-                ->map(fn (Player $player) => ['name' => $player->name, 'taps' => $player->taps])
-                ->all();
+        if ($stopped) {
+            $game->refresh();
+            $this->broadcast(new RoundStopped($room->channel(), $this->state($game)));
         }
-
-        return $top;
     }
 
-    public function playerPayload(Player $player): array
+    /**
+     * Finishers first (earliest finish time wins), then by taps.
+     */
+    private function ranked(Game $game): Builder
+    {
+        return Player::query()
+            ->where('game_id', $game->id)
+            ->orderByRaw('reached_ms IS NULL')
+            ->orderBy('reached_ms')
+            ->orderByDesc('taps')
+            ->orderBy('updated_at')
+            ->orderBy('id');
+    }
+
+    private function leaders(Game $game): array
+    {
+        if ($game->isLobby()) {
+            return [];
+        }
+
+        return $this->ranked($game)
+            ->where('taps', '>', 0)
+            ->limit(config('zhilik.leaderboard_size'))
+            ->get()
+            ->values()
+            ->map(fn (Player $player, int $i) => $this->entry($game, $player, $i + 1))
+            ->all();
+    }
+
+    private function winnerPayload(Game $game): ?array
+    {
+        $player = $game->winner_player_id ? Player::query()->find($game->winner_player_id) : null;
+
+        return $player ? $this->entry($game, $player, 1) : null;
+    }
+
+    private function mePayload(Game $game, string $clientId): ?array
+    {
+        $player = Player::query()
+            ->where('game_id', $game->id)
+            ->where('client_id', $clientId)
+            ->first();
+
+        if (! $player) {
+            return null;
+        }
+
+        $place = null;
+
+        if ($game->isFinished() && $player->taps > 0) {
+            $place = $this->ranked($game)->pluck('id')->search($player->id) + 1;
+        }
+
+        return $this->entry($game, $player, $place);
+    }
+
+    private function entry(Game $game, Player $player, ?int $place): array
     {
         return [
-            'side' => $player->side,
+            'place' => $place,
             'name' => $player->name,
             'taps' => (int) $player->taps,
+            'timeMs' => $player->reached_ms !== null ? $player->reached_ms - $game->starts_at_ms : null,
         ];
     }
 
@@ -334,7 +391,7 @@ class GameService
 
         $this->broadcast(new ScoreUpdated($room->channel(), [
             'gameId' => $game->id,
-            'scores' => $this->tapTotals($game),
+            'leaders' => $this->leaders($game),
             'serverNow' => $now,
         ]));
     }
@@ -358,32 +415,9 @@ class GameService
         };
     }
 
-    private function playerCounts(Game $game): array
+    private function playerCount(Game $game): int
     {
-        $rows = Player::query()
-            ->where('game_id', $game->id)
-            ->selectRaw('side, COUNT(*) as total')
-            ->groupBy('side')
-            ->pluck('total', 'side');
-
-        return [
-            'left' => (int) ($rows['left'] ?? 0),
-            'right' => (int) ($rows['right'] ?? 0),
-        ];
-    }
-
-    private function tapTotals(Game $game): array
-    {
-        $rows = Player::query()
-            ->where('game_id', $game->id)
-            ->selectRaw('side, COALESCE(SUM(taps), 0) as total')
-            ->groupBy('side')
-            ->pluck('total', 'side');
-
-        return [
-            'left' => (int) ($rows['left'] ?? 0),
-            'right' => (int) ($rows['right'] ?? 0),
-        ];
+        return Player::query()->where('game_id', $game->id)->count();
     }
 
     private function finishAllowedAtMs(Game $game): int

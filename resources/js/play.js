@@ -1,8 +1,7 @@
-import { api, config, createClock, createEcho, isEchoConnected, phaseOf, SIDES } from './common';
+import { api, config, createClock, createEcho, escapeHtml, formatSeconds, isEchoConnected, phaseOf } from './common';
 
 const $ = (selector) => document.querySelector(selector);
 
-const side = config.side;
 const joinedKey = `joined.${config.room}`;
 const root = $('#play');
 const clock = createClock();
@@ -16,15 +15,16 @@ const els = {
     phoneCount: $('#phoneCount'),
     tapBtn: $('#tapBtn'),
     tapTime: $('#tapTime'),
+    leaderInfo: $('#leaderInfo'),
     myTaps: $('#myTaps'),
-    miniFill: $('#miniFill'),
-    miniLeft: $('#miniLeft'),
-    miniRight: $('#miniRight'),
+    myProgress: $('#myProgress'),
+    doneTime: $('#doneTime'),
     judgeTaps: $('#judgeTaps'),
     resultTitle: $('#resultTitle'),
     resultSub: $('#resultSub'),
     resultTaps: $('#resultTaps'),
-    resultScore: $('#resultScore'),
+    resultTime: $('#resultTime'),
+    resultWinner: $('#resultWinner'),
     retryBtn: $('#retryBtn'),
 };
 
@@ -44,28 +44,29 @@ let joined = false;
 let joining = false;
 let taps = 0;
 let sent = 0;
+let reachedAt = null;
 let sending = false;
 let lastCount = null;
 let renderedKey = null;
+let buzzedFor = null;
 let wakeLock = null;
 
 els.nameInput.value = storage.get('name') ?? '';
+
+const target = () => state?.targetTaps ?? 100;
 
 function setView(name) {
     if (root.dataset.view !== name) root.dataset.view = name;
 }
 
-function renderCounts() {
-    if (!state?.players) return;
-    els.waitCounts.textContent = `${SIDES.left.kk}: ${state.players.left} · ${SIDES.right.kk}: ${state.players.right}`;
+function renderTaps() {
+    els.myTaps.textContent = taps;
+    els.myProgress.style.width = `${Math.min(100, (taps / target()) * 100)}%`;
 }
 
-function renderMini(scores) {
-    if (!scores) return;
-    const total = scores.left + scores.right;
-    els.miniFill.style.width = `${total ? (scores.left / total) * 100 : 50}%`;
-    els.miniLeft.textContent = scores.left;
-    els.miniRight.textContent = scores.right;
+function renderLeader(leaders) {
+    const leader = leaders?.[0];
+    els.leaderInfo.textContent = leader ? `👑 ${leader.name} · ${leader.taps}` : '';
 }
 
 function applyState(next) {
@@ -75,13 +76,17 @@ function applyState(next) {
     if (!state || next.gameId !== state.gameId) {
         taps = 0;
         sent = 0;
-        els.myTaps.textContent = '0';
+        reachedAt = null;
     }
 
+    const resultShown = renderedKey === `${next.gameId}:finished`;
     state = { ...state, ...next };
-    renderCounts();
-    renderMini(state.scores);
+    els.waitCounts.textContent = `Ойыншылар · Игроков: ${state.players ?? 0}`;
+    renderTaps();
+    renderLeader(state.leaders);
     tick();
+
+    if (resultShown && next.me) showResult();
 }
 
 async function requestWakeLock() {
@@ -99,12 +104,7 @@ async function join(name) {
     els.joinError.textContent = '';
 
     try {
-        const res = await api('/join', { method: 'POST', body: { clientId, side, name: name || null } });
-
-        if (res.player.side !== side) {
-            window.location.replace(config.playUrls[res.player.side]);
-            return;
-        }
+        const res = await api('/join', { method: 'POST', body: { clientId, name: name || null } });
 
         joined = true;
         storage.set(joinedKey, '1');
@@ -129,7 +129,7 @@ async function join(name) {
 
 async function poll() {
     try {
-        applyState(await api('/state', { clock }));
+        applyState(await api(`/state?clientId=${encodeURIComponent(clientId)}`, { clock }));
     } catch {
         // retried by the interval
     }
@@ -140,7 +140,11 @@ async function syncTaps({ final = false } = {}) {
     sending = true;
     const value = taps;
     try {
-        const res = await api('/taps', { method: 'POST', body: { clientId, taps: value }, keepalive: final });
+        const res = await api('/taps', {
+            method: 'POST',
+            body: { clientId, taps: value, reachedAt },
+            keepalive: final,
+        });
         if (res.accepted) sent = Math.max(sent, value);
         if (res.reason === 'not_joined') join(storage.get('name'));
     } catch {
@@ -148,31 +152,40 @@ async function syncTaps({ final = false } = {}) {
     } finally {
         sending = false;
     }
+    if (reachedAt && taps > sent) syncTaps({ final: true });
 }
 
 function showResult() {
+    const me = state.me;
+    const vibrate = (pattern) => {
+        if (buzzedFor === state.gameId) return;
+        buzzedFor = state.gameId;
+        navigator.vibrate?.(pattern);
+    };
     const winner = state.winner;
-    const myTaps = Math.max(taps, sent);
+    const myTaps = Math.max(me?.taps ?? 0, sent);
     els.resultTaps.textContent = myTaps;
+    els.resultTime.textContent = me?.timeMs != null ? `уақыт · время: ${formatSeconds(me.timeMs)}` : 'менің басуым · мои нажатия';
+    els.resultWinner.innerHTML = winner
+        ? `👑 ${escapeHtml(winner.name)}${winner.timeMs != null ? ` · ${formatSeconds(winner.timeMs)}` : ''}`
+        : '';
 
     els.resultTitle.className = 'result-title';
-    if (winner === 'draw') {
-        els.resultTitle.textContent = 'Тең!';
-        els.resultSub.textContent = 'Ничья · Жілік екіге бөлінді';
-    } else if (winner === side) {
+    if (me?.place === 1) {
         els.resultTitle.textContent = 'Жеңіс!';
         els.resultTitle.classList.add('win');
-        els.resultSub.textContent = 'Победа! Жілікті сіздің жақ сындырды!';
-        navigator.vibrate?.([80, 60, 80, 60, 200]);
+        els.resultSub.textContent = 'Победа! Жілікті сіз сындырдыңыз!';
+        vibrate([80, 60, 80, 60, 200]);
+    } else if (me?.place) {
+        els.resultTitle.textContent = `${me.place}-орын`;
+        els.resultTitle.classList.add(me.place <= 3 ? 'win' : 'lose');
+        els.resultSub.textContent = `${me.place}-е место · Келесі жолы жеңесіз!`;
+        vibrate(200);
     } else {
-        els.resultTitle.textContent = 'Жеңіліс';
+        els.resultTitle.textContent = 'Ойын аяқталды';
         els.resultTitle.classList.add('lose');
-        els.resultSub.textContent = 'Поражение · Келесі жолы жеңесіз!';
-        navigator.vibrate?.(300);
+        els.resultSub.textContent = me ? 'Игра окончена' : 'Нәтиже санауда · Считаем места…';
     }
-
-    const s = state.scores ?? { left: 0, right: 0 };
-    els.resultScore.innerHTML = `<span style="color:#7fb0ff">${s.left}</span> : <span style="color:#ff8a8c">${s.right}</span>`;
 }
 
 function tick() {
@@ -207,17 +220,20 @@ function tick() {
         }
         case 'playing':
             if (changed) navigator.vibrate?.(120);
-            setView('tap');
-            els.tapTime.textContent = Math.max(0, (state.endsAt - now) / 1000).toFixed(1);
+            setView(reachedAt ? 'done' : 'tap');
+            els.tapTime.textContent = Math.max(0, (now - state.startsAt) / 1000).toFixed(1);
             break;
         case 'judging':
-            setView('judging');
+            setView(reachedAt ? 'done' : 'judging');
             els.judgeTaps.textContent = taps;
             if (changed) syncTaps({ final: true });
             break;
         case 'finished':
             setView('result');
-            if (changed) showResult();
+            if (changed) {
+                showResult();
+                if (!state.me) setTimeout(poll, Math.random() * 600);
+            }
             break;
     }
 
@@ -226,12 +242,20 @@ function tick() {
 
 function onTap(event) {
     event.preventDefault();
-    if (!joined || !state || phaseOf(state, clock.now()) !== 'playing') return;
+    if (!joined || !state || reachedAt || phaseOf(state, clock.now()) !== 'playing') return;
 
     taps += 1;
-    els.myTaps.textContent = taps;
+    renderTaps();
     els.tapBtn.classList.add('hit');
     navigator.vibrate?.(8);
+
+    if (taps >= target()) {
+        reachedAt = Math.round(clock.now());
+        els.doneTime.textContent = formatSeconds(reachedAt - state.startsAt);
+        navigator.vibrate?.([60, 40, 160]);
+        setView('done');
+        syncTaps({ final: true });
+    }
 }
 
 els.tapBtn.addEventListener('pointerdown', onTap);
@@ -270,13 +294,17 @@ if (echo) {
     channel.listen('.players.updated', (e) => {
         if (!state || e.gameId !== state.gameId) return;
         state.players = e.players;
-        renderCounts();
+        els.waitCounts.textContent = `Ойыншылар · Игроков: ${e.players}`;
     });
     channel.listen('.game.started', (e) => applyState(e));
     channel.listen('.score.updated', (e) => {
-        if (state && e.gameId === state.gameId) renderMini(e.scores);
+        if (state && e.gameId === state.gameId) renderLeader(e.leaders);
     });
-    channel.listen('.game.finished', (e) => applyState(e));
+    channel.listen('.round.stopped', (e) => applyState(e));
+    channel.listen('.game.finished', (e) => {
+        applyState({ ...e, me: null });
+        setTimeout(poll, 200 + Math.random() * 800);
+    });
     channel.listen('.game.reset', (e) => {
         applyState(e);
         if (joined) {

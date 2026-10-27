@@ -8,9 +8,13 @@ return [
     |--------------------------------------------------------------------------
     */
 
-    'max_per_side' => (int) env('ZHILIK_MAX_PER_SIDE', 50),
+    'max_players' => (int) env('ZHILIK_MAX_PLAYERS', 100),
 
-    'round_seconds' => (int) env('ZHILIK_ROUND_SECONDS', 10),
+    // The first player to reach exactly this many taps breaks the bone.
+    'target_taps' => (int) env('ZHILIK_TARGET_TAPS', 100),
+
+    // Time limit if nobody reaches the target; then the most taps wins.
+    'max_seconds' => (int) env('ZHILIK_MAX_SECONDS', 30),
 
     'countdown_seconds' => (int) env('ZHILIK_COUNTDOWN_SECONDS', 3),
 
@@ -23,8 +27,11 @@ return [
     // Minimum interval between score broadcasts, in milliseconds.
     'score_broadcast_ms' => (int) env('ZHILIK_SCORE_BROADCAST_MS', 250),
 
-    // Late tap updates are still accepted for this long after the round ends.
+    // Late tap updates (and other finishers) are still accepted for this long after the round stops.
     'grace_seconds' => (int) env('ZHILIK_GRACE_SECONDS', 1),
+
+    // How many players the big screen leaderboard shows.
+    'leaderboard_size' => (int) env('ZHILIK_LEADERBOARD_SIZE', 10),
 
     // Password for /admin, where host keys are managed. Admin is disabled when empty.
     'admin_password' => env('ZHILIK_ADMIN_PASSWORD'),
@@ -40,7 +47,5 @@ return [
         'port' => (int) (env('VITE_REVERB_PORT') ?: env('REVERB_PORT', 443)),
         'scheme' => env('VITE_REVERB_SCHEME') ?: env('REVERB_SCHEME', 'https'),
     ],
-
-    'sides' => ['left', 'right'],
 
 ];

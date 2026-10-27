@@ -7,7 +7,8 @@ use Illuminate\Support\Facades\Route;
 Route::get('/', [GameController::class, 'screen']);
 Route::post('/', [GameController::class, 'hostLogin'])->middleware('throttle:10,1');
 Route::post('/logout', [GameController::class, 'hostLogout']);
-Route::get('/play/{room:code}/{side}', [GameController::class, 'play']);
+Route::get('/play/{room:code}', [GameController::class, 'play']);
+Route::redirect('/play/{room}/{side}', '/play/{room}');
 
 Route::prefix('admin')->group(function () {
     Route::get('/', [AdminController::class, 'index']);

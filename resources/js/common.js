@@ -3,11 +3,6 @@ import Pusher from 'pusher-js';
 
 export const config = window.ZHILIK ?? {};
 
-export const SIDES = {
-    left: { kk: 'Көк жақ', ru: 'Синие', color: '#2f7cf6' },
-    right: { kk: 'Қызыл жақ', ru: 'Красные', color: '#e5383b' },
-};
-
 export function createEcho() {
     const { reverb } = config;
     if (!reverb?.key || !reverb?.host) {
@@ -150,6 +145,10 @@ export function crackSound() {
     thump.connect(thumpGain).connect(ctx.destination);
     thump.start();
     thump.stop(ctx.currentTime + 0.35);
+}
+
+export function formatSeconds(ms) {
+    return `${(Math.max(0, ms) / 1000).toFixed(2)} с`;
 }
 
 export function escapeHtml(value) {

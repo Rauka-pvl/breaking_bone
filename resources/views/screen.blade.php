@@ -1,6 +1,6 @@
 @extends('layouts.app', [
     'entry' => 'resources/js/screen.js',
-    'zhilik' => $config + ['joinUrls' => $joinUrls],
+    'zhilik' => $config + ['joinUrl' => $joinUrl],
 ])
 
 @section('title', 'Жілік сындыру — экран')
@@ -12,52 +12,55 @@
 
     <header class="screen-header">
         <h1 class="zh-title">Жілік сындыру</h1>
-        <p>Қазақтың ұлттық дәстүрі · Казахская национальная традиция · QR-ды сканерлеп, жағыңды таңда!</p>
+        <p>Қазақтың ұлттық дәстүрі · Казахская национальная традиция · Кім бірінші {{ config('zhilik.target_taps') }} рет басады?</p>
     </header>
 
     <main class="screen-main">
-        @foreach (['left' => ['Көк жақ', 'Синие'], 'right' => ['Қызыл жақ', 'Красные']] as $side => [$kk, $ru])
-            @if ($side === 'right')
-                <section class="stage" id="stage">
-                    <canvas class="fx" id="fx"></canvas>
+        <aside class="panel join-panel" id="joinPanel">
+            <h2>Қосыл!</h2>
+            <div class="sub">Сканируй QR и играй</div>
+            <div class="qr" id="qr"><img alt="QR"></div>
+            <div class="count"><b id="playerCount">0</b> / <span id="maxPlayers">{{ config('zhilik.max_players') }}</span> ойыншы</div>
+            <ul class="names" id="names"></ul>
+        </aside>
 
-                    <div class="timer" id="timer">10.0</div>
-                    <div class="status-line" id="status">Ойыншыларды күтеміз · Ждём игроков</div>
+        <section class="stage" id="stage">
+            <canvas class="fx" id="fx"></canvas>
 
-                    <div class="bone-wrap" id="bone">
-                        @include('partials.bone')
-                    </div>
+            <div class="timer" id="timer">0.0</div>
+            <div class="status-line" id="status">Ойыншыларды күтеміз · Ждём игроков</div>
 
-                    <div class="tug" aria-hidden="true"><div class="fill" id="tugFill"></div><div class="mid"></div></div>
+            <div class="bone-wrap" id="bone">
+                @include('partials.bone')
+            </div>
 
-                    <div class="controls" id="controls">
-                        <button class="zh-btn" id="startBtn">Бастау · Старт</button>
-                        <button class="zh-btn ghost" id="resetBtn">Жаңа ойын</button>
-                    </div>
+            <div class="race" aria-hidden="true">
+                <div class="race-bar"><div class="fill" id="raceFill"></div></div>
+                <div class="race-label" id="raceLabel">Бірінші {{ config('zhilik.target_taps') }} басқан жеңеді · Первый до {{ config('zhilik.target_taps') }} побеждает</div>
+            </div>
 
-                    <div class="overlay" id="countdown"><div class="countdown-num" id="countNum">3</div></div>
+            <div class="controls" id="controls">
+                <button class="zh-btn" id="startBtn">Бастау · Старт</button>
+                <button class="zh-btn ghost" id="resetBtn">Жаңа ойын</button>
+            </div>
 
-                    <div class="overlay result" id="result">
-                        <div class="result-card">
-                            <h2 class="zh-title">Жілік сынды!</h2>
-                            <div class="winner-name" id="winnerName"></div>
-                            <div class="final" id="finalScore"></div>
-                            <div class="top" id="topPlayers"></div>
-                        </div>
-                    </div>
-                </section>
-            @endif
+            <div class="overlay" id="countdown"><div class="countdown-num" id="countNum">3</div></div>
 
-            <aside class="team {{ $side }}" id="team-{{ $side }}">
-                <h2>{{ $kk }}</h2>
-                <div class="sub">{{ $ru }}</div>
-                <div class="qr" id="qr-{{ $side }}"><img alt="QR {{ $kk }}"></div>
-                <div class="count"><b data-count>0</b> / <span data-max>{{ config('zhilik.max_per_side') }}</span> ойыншы</div>
-                <div class="score" data-score>0</div>
-                <div class="score-label">басу · нажатий</div>
-                <ul class="names" data-names></ul>
-            </aside>
-        @endforeach
+            <div class="overlay result" id="result">
+                <div class="result-card">
+                    <h2 class="zh-title">Жілік сынды!</h2>
+                    <div class="winner-name" id="winnerName"></div>
+                    <div class="final" id="winnerTime"></div>
+                    <ol class="podium" id="podium"></ol>
+                </div>
+            </div>
+        </section>
+
+        <aside class="panel board-panel">
+            <h2>Көшбасшылар</h2>
+            <div class="sub">Лидеры · {{ config('zhilik.target_taps') }} басу</div>
+            <ol class="board" id="board"></ol>
+        </aside>
     </main>
 
     <div class="zh-band"></div>
