@@ -22,10 +22,31 @@
         ['0.9', 'M 321 115 L 326 123 L 338 124'],
     ];
 
-    // Curled fingers of the hammer fist, pinky (striking edge) first; they fan out following the round fist.
-    $fingers = ['M -24 -20 Q 8 -21 34 -16', 'M -26 -37 Q 14 -40 44 -35', 'M -26 -55 Q 16 -59 46 -56', 'M -24 -73 Q 14 -78 40 -77'];
-    $fingerCrease = [[6, -20], [12, -38], [14, -57], [12, -76]];
-    $thumb = 'M -42 -40 C -40 -60, -22 -70, 10 -68';
+    // Curled fingers of the hammer fist seen from the palm side, pinky (striking edge) first:
+    // [tucked fingertip x, knuckle x, centre y, half thickness, bow]. Upper fingers overlap the lower ones.
+    $fingerSpecs = [[-18, 33, -18, 8.6, 2], [-23, 45, -36, 10, 3], [-24, 49, -55, 10.4, 3], [-21, 44, -74, 10, 3]];
+    $fingers = collect($fingerSpecs)->map(function ($s) {
+        [$x0, $x1, $y, $h, $bow] = $s;
+        $m = ($x0 + $x1) / 2;
+        $p = fn (...$v) => implode(' ', array_map(fn ($n) => round($n, 1), $v));
+
+        return [
+            'd' => 'M '.$p($x0, $y - 0.7 * $h)
+                .' Q '.$p($m, $y - $h - $bow, $x1 - $h, $y - 0.96 * $h)
+                .' C '.$p($x1 - 0.35 * $h, $y - 1.16 * $h, $x1 + 0.22 * $h, $y - 0.58 * $h, $x1 + 0.1 * $h, $y + 0.05 * $h)
+                .' C '.$p($x1 + 0.02 * $h, $y + 0.6 * $h, $x1 - 0.45 * $h, $y + 0.98 * $h, $x1 - 1.15 * $h, $y + 0.92 * $h)
+                .' Q '.$p($m, $y + $h - $bow, $x0, $y + 0.66 * $h)
+                .' C '.$p($x0 - 0.6 * $h, $y + 0.6 * $h, $x0 - 0.6 * $h, $y - 0.62 * $h, $x0, $y - 0.7 * $h).' Z',
+            'joint' => 'M '.$p($x0 + 0.3 * ($x1 - $x0), $y - 0.78 * $h).' q '.$p(2.6, 0.78 * $h, 0, 1.56 * $h),
+            'joint2' => 'M '.$p($x0 + 0.3 * ($x1 - $x0) + 3, $y - 0.5 * $h).' q '.$p(1.6, 0.5 * $h, 0, $h),
+            'knuckle' => 'M '.$p($x1 - 1.3 * $h, $y - 0.55 * $h).' q '.$p(2.6, 0.55 * $h, 0, 1.1 * $h)
+                .' M '.$p($x1 - 0.9 * $h, $y - 0.4 * $h).' q '.$p(1.8, 0.4 * $h, 0, 0.8 * $h),
+            'shine' => 'M '.$p($x0 + 5, $y - 0.52 * $h).' Q '.$p($m, $y - 0.6 * $h - $bow, $x1 - 1.4 * $h, $y - 0.6 * $h),
+            'tip' => 'M '.$p($x0 + 1.5, $y + 0.64 * $h).' C '.$p($x0 - 0.5 * $h, $y + 0.56 * $h, $x0 - 0.5 * $h, $y - 0.58 * $h, $x0 + 1.5, $y - 0.68 * $h),
+            'cap' => [$x1 - 0.3 * $h, $y - 0.45 * $h, 0.38 * $h, 0.22 * $h],
+        ];
+    });
+    $thumb = 'M -44 -84 C -34 -100, -14 -100, 2 -93 C 10 -89, 18 -84, 23 -79 C 30 -74, 30 -64, 22 -63 C 15 -62, 8 -66, 0 -70 C -10 -73, -20 -72, -30 -64';
 
     $pores = [[168, 104, 1.6], [196, 117, 1.1], [232, 101, 1.2], [262, 119, 0.9], [352, 103, 1.1], [384, 118, 1.3], [418, 105, 1], [446, 116, 1.4], [62, 150, 1.8], [92, 64, 1.3], [538, 156, 1.6], [508, 66, 1.2]];
 @endphp
@@ -101,11 +122,26 @@
             <use href="#bonePath" fill="none" stroke="#6e4f26" stroke-width="3" stroke-linejoin="round"/>
         </g>
 
-        <radialGradient id="palmGrad" cx="0.38" cy="0.32" r="0.75">
-            <stop offset="0" stop-color="#e9ac7c"/>
-            <stop offset="0.6" stop-color="#d38f61"/>
-            <stop offset="1" stop-color="#b06b42"/>
+        <radialGradient id="palmGrad" cx="0.3" cy="0.4" r="0.8">
+            <stop offset="0" stop-color="#eeb084"/>
+            <stop offset="0.55" stop-color="#d9966a"/>
+            <stop offset="1" stop-color="#b57048"/>
         </radialGradient>
+        <linearGradient id="fingerGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#ffd3ad"/>
+            <stop offset="0.45" stop-color="#f0ae80"/>
+            <stop offset="1" stop-color="#c27a4c"/>
+        </linearGradient>
+        <linearGradient id="thumbGrad" x1="0.2" y1="0" x2="0.4" y2="1">
+            <stop offset="0" stop-color="#ffd9b8"/>
+            <stop offset="0.5" stop-color="#f2b386"/>
+            <stop offset="1" stop-color="#c98153"/>
+        </linearGradient>
+        <linearGradient id="wristGrad" x1="0.9" y1="0" x2="0.1" y2="1">
+            <stop offset="0" stop-color="#f6be93"/>
+            <stop offset="0.55" stop-color="#e2a072"/>
+            <stop offset="1" stop-color="#b8714a"/>
+        </linearGradient>
         <linearGradient id="nailGrad" x1="0" y1="0" x2="1" y2="1">
             <stop offset="0" stop-color="#fff1e8"/>
             <stop offset="1" stop-color="#efc0a8"/>
@@ -136,16 +172,23 @@
 
         {{-- Origin is the striking edge of the fist; the bent chapan sleeve comes from the upper left and fades out. --}}
         <g id="fist" stroke-linejoin="round" stroke-linecap="round">
-            <path d="M -42 -84 C -62 -110, -80 -134, -98 -166 C -110 -190, -117 -214, -122 -250 L -62 -254 C -56 -218, -46 -192, -30 -166 C -14 -140, 0 -118, 14 -96 Z" fill="url(#sleeveGrad)"/>
-            <path d="M -14 -112 C -30 -136, -46 -164, -60 -204 C -64 -218, -66 -230, -68 -240" fill="none" stroke="url(#foldGrad)" stroke-width="2.6"/>
-            <path d="M -40 -110 C -56 -136, -70 -162, -82 -196 C -86 -210, -90 -224, -92 -236" fill="none" stroke="url(#foldGrad)" stroke-width="2.2"/>
-            <path d="M -28 -116 C -44 -142, -58 -168, -71 -202" fill="none" stroke="url(#foldLight)" stroke-width="2.4"/>
-            <path d="M 2 -108 C -14 -132, -28 -156, -40 -184" fill="none" stroke="url(#foldLight)" stroke-width="1.8"/>
+            <path d="M -80.5 -116.7 C -116.5 -137.7, -127.3 -166.3, -144.3 -276.4 L -211.7 -265.6 C -192.7 -155.7, -147.5 -84.3, -111.5 -63.3 Z" fill="url(#sleeveGrad)"/>
+            <path d="M -94 -93.4 C -130 -114.4, -156 -161.6, -174 -271.6" fill="none" stroke="url(#foldGrad)" stroke-width="2.6"/>
+            <path d="M -107 -71.1 C -143 -92.1, -181.8 -157.5, -199.8 -267.5" fill="none" stroke="url(#foldGrad)" stroke-width="2.2"/>
+            <path d="M -87 -105.5 C -123 -126.5, -142.2 -163.9, -160.2 -273.9" fill="none" stroke="url(#foldLight)" stroke-width="2.4"/>
+            <path d="M -101 -81.4 C -137 -102.4, -169.9 -159.4, -187.9 -269.4" fill="none" stroke="url(#foldLight)" stroke-width="1.8"/>
 
-            <path d="M -40 -88 C -10 -100, 34 -94, 46 -66 C 54 -46, 50 -16, 32 -4 C 18 4, -12 4, -30 -6 C -46 -16, -52 -48, -48 -66 C -46 -76, -44 -84, -40 -88 Z" fill="url(#palmGrad)" stroke="#6b3f22" stroke-width="2.3"/>
-            <path d="M -44 -62 C -47 -46, -45 -28, -36 -16" fill="none" stroke="#fff" stroke-opacity="0.22" stroke-width="5"/>
+            <path d="M -24 -84 C -43.7 -89.3, -61.8 -97.3, -78.5 -107.8 L -102.5 -66.2 C -82.2 -55.4, -63.3 -42, -46 -26 Z" fill="url(#wristGrad)"/>
+            <path d="M -24 -84 C -43.7 -89.3, -61.8 -97.3, -78.5 -107.8 M -102.5 -66.2 C -82.2 -55.4, -63.3 -42, -46 -26" fill="none" stroke="#7a4426" stroke-width="1.7"/>
+            <path d="M -32 -83 C -48 -88, -62 -95, -76 -103" fill="none" stroke="#ffe2c8" stroke-opacity="0.5" stroke-width="3"/>
+            <path d="M -98 -63 C -80 -54, -64 -42, -52 -32" fill="none" stroke="#8f4f2c" stroke-opacity="0.4" stroke-width="4"/>
+            <path d="M -50 -89 Q -58 -70, -72 -51 M -56 -86 Q -63 -71, -73 -59" fill="none" stroke="#a8653d" stroke-opacity="0.45" stroke-width="1.2"/>
 
-            <g transform="translate(-21 -101) rotate(-33)">
+            <path d="M -30 -90 C -10 -96, 20 -92, 36 -80 C 50 -66, 54 -30, 40 -10 C 28 2, -10 4, -30 -4 C -48 -12, -60 -32, -58 -52 C -56 -70, -46 -84, -30 -90 Z" fill="url(#palmGrad)" stroke="#7a4426" stroke-width="1.8"/>
+            <path d="M -50 -50 C -52 -34, -46 -20, -34 -12" fill="none" stroke="#fff" stroke-opacity="0.2" stroke-width="5"/>
+            <path d="M -34 -14 C -40 -30, -40 -48, -36 -62" fill="none" stroke="#a8653d" stroke-opacity="0.5" stroke-width="1.3"/>
+
+            <g transform="translate(-92 -88) rotate(-60)">
                 <path d="M -33 -11 Q 0 -14 33 -11 L 33 11 Q 0 14 -33 11 Z" fill="url(#goldGrad)" stroke="#8a5a10" stroke-width="1.4"/>
                 <path d="M -31 -6.5 Q 0 -9 31 -6.5 L 31 6.5 Q 0 9 -31 6.5 Z" fill="#7a1528" stroke="#560c1b" stroke-width="0.8"/>
                 <g fill="none" stroke="#f2c14e" stroke-width="1.3">
@@ -156,22 +199,27 @@
                 <path d="M -31 -9.5 Q 0 -12.5 31 -9.5" fill="none" stroke="#fff6d0" stroke-opacity="0.8" stroke-width="1.2"/>
             </g>
 
-            @foreach ($fingers as $i => $d)
-                <path d="{{ $d }}" fill="none" stroke="#6b3f22" stroke-width="21.5"/>
-                <path d="{{ $d }}" fill="none" stroke="#eeaf81" stroke-width="17"/>
-                <path d="{{ $d }}" fill="none" stroke="#cf8a5b" stroke-width="8" transform="translate(0 4)"/>
-                <path d="{{ $d }}" fill="none" stroke="#ffdcb9" stroke-width="4.5" transform="translate(0 -4.2)"/>
-                <path d="M {{ $fingerCrease[$i][0] }} {{ $fingerCrease[$i][1] - 5 }} q 3.2 5 0 10.5" fill="none" stroke="#a0623b" stroke-width="1.4"/>
+            @foreach ($fingers as $f)
+                <path d="{{ $f['d'] }}" fill="#4a1f0a" fill-opacity="0.35" transform="translate(1.5 3.5)" filter="url(#fistBlur)"/>
+                <path d="{{ $f['d'] }}" fill="url(#fingerGrad)" stroke="#83492a" stroke-width="1.4"/>
+                <path d="{{ $f['tip'] }}" fill="none" stroke="#a8603a" stroke-opacity="0.5" stroke-width="4.5"/>
+                <path d="{{ $f['shine'] }}" fill="none" stroke="#ffe6d0" stroke-opacity="0.6" stroke-width="2.4"/>
+                <path d="{{ $f['joint'] }}" fill="none" stroke="#a8653d" stroke-opacity="0.85" stroke-width="1.3"/>
+                <path d="{{ $f['joint2'] }}" fill="none" stroke="#a8653d" stroke-opacity="0.5" stroke-width="1"/>
+                <path d="{{ $f['knuckle'] }}" fill="none" stroke="#a8653d" stroke-opacity="0.6" stroke-width="1.1"/>
+                <ellipse cx="{{ $f['cap'][0] }}" cy="{{ $f['cap'][1] }}" rx="{{ $f['cap'][2] }}" ry="{{ $f['cap'][3] }}" fill="#fff" fill-opacity="0.35"/>
             @endforeach
 
-            <path d="{{ $thumb }}" fill="none" stroke="#5a2a12" stroke-opacity="0.3" stroke-width="19" transform="translate(2 5)" filter="url(#fistBlur)"/>
-            <path d="{{ $thumb }}" fill="none" stroke="#6b3f22" stroke-width="23"/>
-            <path d="{{ $thumb }}" fill="none" stroke="#f2b88b" stroke-width="18.5"/>
-            <path d="{{ $thumb }}" fill="none" stroke="#d6935f" stroke-width="8" transform="translate(0.5 4.5)"/>
-            <path d="{{ $thumb }}" fill="none" stroke="#ffe2c6" stroke-width="5" transform="translate(-0.5 -4.5)"/>
-            <path d="M -14 -60 q 3 -4.5 7.5 -1.5" fill="none" stroke="#a0623b" stroke-width="1.4"/>
-            <ellipse cx="9" cy="-69.5" rx="6.5" ry="5" transform="rotate(-6 9 -69.5)" fill="url(#nailGrad)" stroke="#b07a58" stroke-width="1.1"/>
-            <ellipse cx="10" cy="-71.5" rx="2.8" ry="1.3" fill="#fff" fill-opacity="0.8"/>
+            <path d="{{ $thumb }} C -38 -58, -46 -62, -48 -70 C -50 -76, -48 -80, -44 -84 Z" fill="#4a1f0a" fill-opacity="0.35" transform="translate(2 4)" filter="url(#fistBlur)"/>
+            <path d="{{ $thumb }} C -38 -58, -46 -62, -48 -70 C -50 -76, -48 -80, -44 -84 Z" fill="url(#thumbGrad)"/>
+            <path d="{{ $thumb }}" fill="none" stroke="#7a4426" stroke-width="1.7"/>
+            <path d="M -30 -64 C -38 -58, -46 -62, -48 -70" fill="none" stroke="#a8653d" stroke-opacity="0.5" stroke-width="1.2"/>
+            <path d="M -30 -94 C -20 -97, -6 -95, 6 -88" fill="none" stroke="#ffe8d4" stroke-opacity="0.65" stroke-width="3"/>
+            <path d="M 5 -91 q -2.5 5 -1.5 10" fill="none" stroke="#a8653d" stroke-width="1.3"/>
+            <path d="M 1 -70 q 2.5 -3.5 6 -3" fill="none" stroke="#a8653d" stroke-opacity="0.6" stroke-width="1"/>
+            <ellipse cx="16" cy="-78" rx="7" ry="4.6" transform="rotate(25 16 -78)" fill="url(#nailGrad)" stroke="#b07a58" stroke-width="1"/>
+            <path d="M 10.5 -81 q -1.5 3.5 1 7" fill="none" stroke="#c98d6c" stroke-width="1"/>
+            <ellipse cx="17" cy="-80" rx="3" ry="1.2" transform="rotate(25 17 -80)" fill="#fff" fill-opacity="0.8"/>
         </g>
     </defs>
 
@@ -219,8 +267,8 @@
             <g class="fist-squash">
                 <g transform="translate(300 52) scale(1.1)">
                     <g class="fist-trail" opacity="0">
-                        <rect x="-66" y="-78" width="4.5" height="66" rx="2.25" fill="url(#trailGrad)"/>
-                        <rect x="-58" y="-58" width="3.5" height="46" rx="1.75" fill="url(#trailGrad)"/>
+                        <rect x="-72" y="-38" width="4.5" height="34" rx="2.25" fill="url(#trailGrad)"/>
+                        <rect x="-63" y="-28" width="3.5" height="24" rx="1.75" fill="url(#trailGrad)"/>
                         <rect x="60" y="-125" width="5" height="105" rx="2.5" fill="url(#trailGrad)"/>
                         <rect x="69" y="-95" width="3.5" height="68" rx="1.75" fill="url(#trailGrad)"/>
                     </g>
