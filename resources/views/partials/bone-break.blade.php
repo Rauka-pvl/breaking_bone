@@ -16,18 +16,24 @@
             </linearGradient>
             <clipPath id="breakClipL"><polygon points="0,0 {{ $fracture }} 0,220"/></clipPath>
             <clipPath id="breakClipR"><polygon points="600,0 {{ $fracture }} 600,220"/></clipPath>
+            @include('partials.fist')
         </defs>
+        <path class="whole" d="{{ $boneD }}" fill="url(#breakGrad)" stroke="#6e4f26" stroke-width="7" stroke-linejoin="round"/>
         @foreach (['L', 'R'] as $side)
             <g class="half half-{{ strtolower($side) }}">
                 <g clip-path="url(#breakClip{{ $side }})">
                     <path d="{{ $boneD }}" fill="url(#breakGrad)" stroke="#6e4f26" stroke-width="7" stroke-linejoin="round"/>
                     <path d="M 160 100 C 220 98, 380 98, 440 100" fill="none" stroke="#fff" stroke-opacity="0.75" stroke-width="5" stroke-linecap="round"/>
-                    <polyline points="302,94 294,102 307,110 296,118 302,126" fill="none" stroke="#6e4f26" stroke-width="6" stroke-linejoin="round"/>
+                    <polyline class="edge" points="302,94 294,102 307,110 296,118 302,126" fill="none" stroke="#6e4f26" stroke-width="6" stroke-linejoin="round"/>
                 </g>
             </g>
         @endforeach
         <polyline class="crack" points="302,94 294,102 307,110 296,118 302,126" pathLength="1" fill="none" stroke="#3d2810" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+        <g class="break-fist">
+            <g transform="translate(300 93) scale(1.3)"><use href="#fist"/></g>
+        </g>
     </svg>
+    <div class="break-hit"></div>
     <div class="break-chips">
         @foreach ($chips as [$dx, $dy, $size, $spin])
             <i style="--dx: {{ $dx }}px; --dy: {{ $dy }}px; --s: {{ $size }}px; --r: {{ $spin }}deg"></i>

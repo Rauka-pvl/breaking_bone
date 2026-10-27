@@ -164,7 +164,7 @@ function showResult() {
     const vibrate = (pattern) => {
         if (buzzedFor === state.gameId) return;
         buzzedFor = state.gameId;
-        navigator.vibrate?.(pattern);
+        setTimeout(() => navigator.vibrate?.(pattern), 1800);
     };
     const winner = state.winner;
     const myTaps = Math.max(me?.taps ?? 0, sent);
@@ -241,6 +241,7 @@ function tick() {
                 els.resultView.classList.remove('go');
                 void els.resultView.offsetWidth;
                 els.resultView.classList.add('go');
+                navigator.vibrate?.([0, 530, 40, 440, 40, 450, 120]);
                 showResult();
                 if (!state.me) setTimeout(poll, Math.random() * 600);
             }

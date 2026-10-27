@@ -570,6 +570,20 @@ code.key { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-siz
 .break-bone { width: 100%; height: 100%; overflow: visible; filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.45)); }
 .break-bone .half { transform-box: fill-box; transform-origin: center; }
 .break-bone .crack { stroke-dasharray: 1; stroke-dashoffset: 1; }
+.break-bone .edge { opacity: 0; }
+.break-bone .break-fist { transform-box: view-box; transform-origin: 300px 93px; opacity: 0; }
+.break-hit {
+    position: absolute;
+    left: 50%;
+    top: 40%;
+    width: 22%;
+    aspect-ratio: 1;
+    translate: -50% -50%;
+    border-radius: 50%;
+    border: 3px solid #fff7d6;
+    opacity: 0;
+    pointer-events: none;
+}
 .break-flash {
     position: absolute;
     left: 50%;
@@ -631,27 +645,56 @@ code.key { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-siz
 .view-result .confetti { position: absolute; inset: 0; z-index: 3; overflow: hidden; pointer-events: none; }
 .view-result .confetti i { position: absolute; top: -24px; left: var(--x); width: 8px; height: 14px; border-radius: 2px; background: var(--c); opacity: 0; }
 
-.view-result.go .break-bone { animation: bone-strain 0.6s ease-in both; }
-.view-result.go .crack { animation: crack-draw 0.45s 0.1s ease-in forwards, fade-out 0.15s 0.62s forwards; }
-.view-result.go .half-l { animation: half-left 1.1s 0.6s cubic-bezier(0.2, 0.8, 0.3, 1) forwards; }
-.view-result.go .half-r { animation: half-right 1.1s 0.6s cubic-bezier(0.2, 0.8, 0.3, 1) forwards; }
-.view-result.go .break-flash { animation: break-flash 0.7s 0.6s ease-out; }
-.view-result.go .break-chips i { animation: chip-burst 0.9s 0.6s cubic-bezier(0.2, 0.7, 0.4, 1); }
-.view-result.go .winner-card { animation: winner-in 0.7s 1.05s cubic-bezier(0.2, 1.4, 0.4, 1) both; }
-.view-result.go .winner-card .crown { animation: crown-drop 0.6s 1.45s cubic-bezier(0.3, 1.6, 0.5, 1) both; }
-.view-result.go .after { animation: fade-up 0.5s 1.7s ease-out both; }
-.view-result.go .after .result-title.win { animation-delay: 1.7s; }
-.view-result.go .confetti i { animation: confetti-fall var(--t) calc(var(--d) + 0.6s) linear forwards; }
+/* The wrapped fist strikes twice (0.53s, 1.01s), the third blow at 1.5s snaps the bone. */
+.view-result.go .break-bone { animation: bone-hits 1.5s linear both; }
+.view-result.go .break-fist { animation: fist-strikes 2.3s linear both; }
+.view-result.go .break-hit { animation: hit-ring 0.4s 0.53s ease-out, hit-ring 0.4s 1.01s ease-out; }
+.view-result.go .crack { animation: crack-steps 1.5s linear forwards, fade-out 0.15s 1.52s forwards; }
+.view-result.go .edge { animation: edge-in 0.05s 1.5s forwards; }
+.view-result.go .whole { animation: fade-out 0.05s 1.5s forwards; }
+.view-result.go .half-l { animation: half-left 1.1s 1.5s cubic-bezier(0.2, 0.8, 0.3, 1) forwards; }
+.view-result.go .half-r { animation: half-right 1.1s 1.5s cubic-bezier(0.2, 0.8, 0.3, 1) forwards; }
+.view-result.go .break-flash { animation: break-flash 0.7s 1.5s ease-out; }
+.view-result.go .break-chips i { animation: chip-burst 0.9s 1.5s cubic-bezier(0.2, 0.7, 0.4, 1); }
+.view-result.go .winner-card { animation: winner-in 0.7s 1.95s cubic-bezier(0.2, 1.4, 0.4, 1) both; }
+.view-result.go .winner-card .crown { animation: crown-drop 0.6s 2.35s cubic-bezier(0.3, 1.6, 0.5, 1) both; }
+.view-result.go .after { animation: fade-up 0.5s 2.6s ease-out both; }
+.view-result.go .after .result-title.win { animation-delay: 2.6s; }
+.view-result.go .confetti i { animation: confetti-fall var(--t) calc(var(--d) + 1.5s) linear forwards; }
 
-@keyframes bone-strain {
-    0% { transform: none; }
-    20% { transform: translate(-3px, 0) rotate(-1deg); }
-    40% { transform: translate(3px, 1px) rotate(1deg); }
-    60% { transform: translate(-4px, 0) rotate(-1.5deg); }
-    80% { transform: translate(4px, 2px) rotate(1.5deg) scale(1.03); }
-    100% { transform: translate(0, 3px) scale(1.04); }
+@keyframes bone-hits {
+    0%, 34% { transform: none; }
+    36% { transform: translateY(5px) scale(1.02, 0.95); }
+    42% { transform: translateY(-1px); }
+    48%, 66% { transform: none; }
+    68% { transform: translateY(6px) scale(1.03, 0.94); }
+    74% { transform: translateY(-1px); }
+    80%, 92% { transform: none; }
+    96% { transform: translate(-2px, 2px) rotate(-1deg); }
+    100% { transform: translateY(4px) scale(1.04, 0.95); }
 }
-@keyframes crack-draw { to { stroke-dashoffset: 0; } }
+@keyframes fist-strikes {
+    0% { opacity: 0; transform: translate(-60px, -240px) rotate(-8deg); animation-timing-function: ease-out; }
+    10% { opacity: 1; transform: translate(0, -70px) rotate(-4deg); }
+    18% { transform: translate(0, -85px) rotate(-6deg); animation-timing-function: cubic-bezier(0.55, 0, 0.9, 0.4); }
+    23%, 27% { transform: none; animation-timing-function: ease-out; }
+    33% { transform: translate(0, -75px) rotate(-5deg); }
+    39% { transform: translate(0, -90px) rotate(-7deg); animation-timing-function: cubic-bezier(0.55, 0, 0.9, 0.4); }
+    44%, 47% { transform: none; animation-timing-function: ease-out; }
+    54% { transform: translate(0, -95px) rotate(-8deg); }
+    61% { transform: translate(0, -125px) rotate(-11deg); animation-timing-function: cubic-bezier(0.55, 0, 0.9, 0.4); }
+    65% { transform: translate(0, 28px) rotate(0); animation-timing-function: ease-out; }
+    72% { opacity: 1; transform: translate(0, 34px); animation-timing-function: ease-in; }
+    100% { opacity: 0; transform: translate(-30px, -170px) rotate(-8deg); }
+}
+@keyframes edge-in { to { opacity: 1; } }
+@keyframes hit-ring { 0% { opacity: 1; transform: scale(0.3); } 100% { opacity: 0; transform: scale(1.6); } }
+@keyframes crack-steps {
+    0%, 35% { stroke-dashoffset: 1; }
+    37%, 67% { stroke-dashoffset: 0.55; }
+    69%, 99% { stroke-dashoffset: 0.2; }
+    100% { stroke-dashoffset: 0; }
+}
 @keyframes fade-out { to { opacity: 0; } }
 @keyframes half-left {
     0% { transform: none; }
