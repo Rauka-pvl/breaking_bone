@@ -37,22 +37,14 @@
                 .' C '.$p($x1 + 0.02 * $h, $y + 0.6 * $h, $x1 - 0.45 * $h, $y + 0.98 * $h, $x1 - 1.15 * $h, $y + 0.92 * $h)
                 .' Q '.$p($m, $y + $h - $bow, $x0, $y + 0.66 * $h)
                 .' C '.$p($x0 - 0.6 * $h, $y + 0.6 * $h, $x0 - 0.6 * $h, $y - 0.62 * $h, $x0, $y - 0.7 * $h).' Z',
-            'joint' => 'M '.$p($x0 + 0.3 * ($x1 - $x0), $y - 0.78 * $h).' q '.$p(2.6, 0.78 * $h, 0, 1.56 * $h),
-            'joint2' => 'M '.$p($x0 + 0.3 * ($x1 - $x0) + 3, $y - 0.5 * $h).' q '.$p(1.6, 0.5 * $h, 0, $h),
-            'knuckle' => 'M '.$p($x1 - 1.3 * $h, $y - 0.55 * $h).' q '.$p(2.6, 0.55 * $h, 0, 1.1 * $h)
-                .' M '.$p($x1 - 0.9 * $h, $y - 0.4 * $h).' q '.$p(1.8, 0.4 * $h, 0, 0.8 * $h),
             'shine' => 'M '.$p($x0 + 5, $y - 0.52 * $h).' Q '.$p($m, $y - 0.6 * $h - $bow, $x1 - 1.4 * $h, $y - 0.6 * $h),
             'tip' => 'M '.$p($x0 + 1.5, $y + 0.64 * $h).' C '.$p($x0 - 0.5 * $h, $y + 0.56 * $h, $x0 - 0.5 * $h, $y - 0.58 * $h, $x0 + 1.5, $y - 0.68 * $h),
-            'cap' => [$x1 - 0.3 * $h, $y - 0.45 * $h, 0.38 * $h, 0.22 * $h],
         ];
     });
     $palm = 'M -30 -90 C -10 -96, 20 -92, 36 -80 C 50 -66, 54 -30, 40 -10 C 28 2, -10 4, -30 -4 C -48 -12, -60 -32, -58 -52 C -56 -70, -46 -84, -30 -90 Z';
-    // Cloth strips around the fist, clipped to the palm: one across the heel, two crossing over the fingers.
-    $wraps = [
-        'M -52 -100 C -56 -66, -60 -38, -56 0 L -28 8 C -32 -30, -30 -62, -22 -100 Z',
-        'M -36 8 C -22 -32, -6 -66, 8 -102 L 27 -100 C 13 -64, -3 -30, -15 8 Z',
-        'M -25 -102 C -17 -64, -7 -30, 1 10 L 22 8 C 12 -30, 4 -64, -4 -104 Z',
-    ];
+    // Edges of the cloth turns wound over the whole fist: a steep spiral plus a fainter crossing layer.
+    $wrapTurns = collect(range(-4, 4))->map(fn ($k) => sprintf('M %d 14 Q %d -48 %d -110', $k * 21 - 24, $k * 21 + 10, $k * 21 + 22));
+    $wrapCross = collect(range(-2, 3))->map(fn ($k) => sprintf('M %d 14 Q %d -48 %d -110', $k * 30 + 26, $k * 30 + 8, $k * 30 - 20));
     $thumb = 'M -44 -84 C -34 -100, -14 -100, 2 -93 C 10 -89, 18 -84, 23 -79 C 30 -74, 30 -64, 22 -63 C 15 -62, 8 -66, 0 -70 C -10 -73, -20 -72, -30 -64';
 
     $pores = [[168, 104, 1.6], [196, 117, 1.1], [232, 101, 1.2], [262, 119, 0.9], [352, 103, 1.1], [384, 118, 1.3], [418, 105, 1], [446, 116, 1.4], [62, 150, 1.8], [92, 64, 1.3], [538, 156, 1.6], [508, 66, 1.2]];
@@ -129,22 +121,32 @@
             <use href="#bonePath" fill="none" stroke="#6e4f26" stroke-width="3" stroke-linejoin="round"/>
         </g>
 
-        <radialGradient id="palmGrad" cx="0.3" cy="0.4" r="0.8">
-            <stop offset="0" stop-color="#eeb084"/>
-            <stop offset="0.55" stop-color="#d9966a"/>
-            <stop offset="1" stop-color="#b57048"/>
-        </radialGradient>
-        <linearGradient id="fingerGrad" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0" stop-color="#ffd3ad"/>
-            <stop offset="0.45" stop-color="#f0ae80"/>
-            <stop offset="1" stop-color="#c27a4c"/>
-        </linearGradient>
         <linearGradient id="thumbGrad" x1="0.2" y1="0" x2="0.4" y2="1">
             <stop offset="0" stop-color="#ffd9b8"/>
             <stop offset="0.5" stop-color="#f2b386"/>
             <stop offset="1" stop-color="#c98153"/>
         </linearGradient>
-        <clipPath id="fistClip"><path d="{{ $palm }}"/></clipPath>
+        <clipPath id="fistClip">
+            <path d="{{ $palm }}"/>
+            @foreach ($fingers as $f)
+                <path d="{{ $f['d'] }}"/>
+            @endforeach
+        </clipPath>
+        <radialGradient id="clothPalm" cx="0.35" cy="0.35" r="0.8">
+            <stop offset="0" stop-color="#ffffff"/>
+            <stop offset="0.6" stop-color="#ece8df"/>
+            <stop offset="1" stop-color="#bfb8a8"/>
+        </radialGradient>
+        <linearGradient id="clothFinger" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#ffffff"/>
+            <stop offset="0.5" stop-color="#f2efe8"/>
+            <stop offset="1" stop-color="#c8c1b2"/>
+        </linearGradient>
+        <radialGradient id="clothShade" cx="0.42" cy="0.38" r="0.7">
+            <stop offset="0" stop-color="#6b604c" stop-opacity="0"/>
+            <stop offset="0.7" stop-color="#6b604c" stop-opacity="0"/>
+            <stop offset="1" stop-color="#6b604c" stop-opacity="0.35"/>
+        </radialGradient>
         <linearGradient id="clothGrad" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0" stop-color="#bfb9ac"/>
             <stop offset="0.25" stop-color="#f4f2ec"/>
@@ -203,9 +205,13 @@
             <path d="M -98 -63 C -80 -54, -64 -42, -52 -32" fill="none" stroke="#8f4f2c" stroke-opacity="0.4" stroke-width="4"/>
             <path d="M -50 -89 Q -58 -70, -72 -51 M -56 -86 Q -63 -71, -73 -59" fill="none" stroke="#a8653d" stroke-opacity="0.45" stroke-width="1.2"/>
 
-            <path d="{{ $palm }}" fill="url(#palmGrad)" stroke="#7a4426" stroke-width="1.8"/>
-            <path d="M -50 -50 C -52 -34, -46 -20, -34 -12" fill="none" stroke="#fff" stroke-opacity="0.2" stroke-width="5"/>
-            <path d="M -34 -14 C -40 -30, -40 -48, -36 -62" fill="none" stroke="#a8653d" stroke-opacity="0.5" stroke-width="1.3"/>
+            {{-- White cloth (ақ орамал) wound over the whole fist and the wrist before striking; the thumb stays free. --}}
+            <path d="{{ $palm }}" fill="url(#clothPalm)" stroke="#8f8878" stroke-width="1.6"/>
+            <g transform="translate(-61.75 -70.5) rotate(-60)">
+                <path d="M -30 -9 Q 0 -12 30 -9 Q 33 0 30 9 Q 0 12 -30 9 Q -33 0 -30 -9 Z" fill="url(#clothGrad)" stroke="#a39d90" stroke-width="1"/>
+                <path d="M -31 1 Q 0 -2 31 -4" fill="none" stroke="#a39d90" stroke-width="1"/>
+                <path d="M -24 -4 Q 0 -6.5 24 -6" fill="none" stroke="#fff" stroke-opacity="0.9" stroke-width="1.6"/>
+            </g>
 
             <g transform="translate(-92 -88) rotate(-60)">
                 <path d="M -33 -11 Q 0 -14 33 -11 L 33 11 Q 0 14 -33 11 Z" fill="url(#goldGrad)" stroke="#8a5a10" stroke-width="1.4"/>
@@ -219,24 +225,21 @@
             </g>
 
             @foreach ($fingers as $f)
-                <path d="{{ $f['d'] }}" fill="#4a1f0a" fill-opacity="0.35" transform="translate(1.5 3.5)" filter="url(#fistBlur)"/>
-                <path d="{{ $f['d'] }}" fill="url(#fingerGrad)" stroke="#83492a" stroke-width="1.4"/>
-                <path d="{{ $f['tip'] }}" fill="none" stroke="#a8603a" stroke-opacity="0.5" stroke-width="4.5"/>
-                <path d="{{ $f['shine'] }}" fill="none" stroke="#ffe6d0" stroke-opacity="0.6" stroke-width="2.4"/>
-                <path d="{{ $f['joint'] }}" fill="none" stroke="#a8653d" stroke-opacity="0.85" stroke-width="1.3"/>
-                <path d="{{ $f['joint2'] }}" fill="none" stroke="#a8653d" stroke-opacity="0.5" stroke-width="1"/>
-                <path d="{{ $f['knuckle'] }}" fill="none" stroke="#a8653d" stroke-opacity="0.6" stroke-width="1.1"/>
-                <ellipse cx="{{ $f['cap'][0] }}" cy="{{ $f['cap'][1] }}" rx="{{ $f['cap'][2] }}" ry="{{ $f['cap'][3] }}" fill="#fff" fill-opacity="0.35"/>
+                <path d="{{ $f['d'] }}" fill="#3a2a1a" fill-opacity="0.28" transform="translate(1.5 3.5)" filter="url(#fistBlur)"/>
+                <path d="{{ $f['d'] }}" fill="url(#clothFinger)" stroke="#8f8878" stroke-width="1.3"/>
+                <path d="{{ $f['tip'] }}" fill="none" stroke="#b3ac9c" stroke-opacity="0.6" stroke-width="4"/>
+                <path d="{{ $f['shine'] }}" fill="none" stroke="#fff" stroke-opacity="0.9" stroke-width="2.4"/>
             @endforeach
 
-            {{-- White cloth (ақ орамал) wound around the fist before striking the bone; the thumb stays free. --}}
-            <g clip-path="url(#fistClip)">
-                @foreach ($wraps as $d)
-                    <path d="{{ $d }}" fill="#3a2a1a" fill-opacity="0.35" transform="translate(2 2.5)" filter="url(#fistBlur)"/>
-                    <path d="{{ $d }}" fill="url(#clothGrad)" stroke="#a39d90" stroke-width="1"/>
+            <g clip-path="url(#fistClip)" fill="none">
+                @foreach ($wrapCross as $d)
+                    <path d="{{ $d }}" stroke="#b9b3a5" stroke-opacity="0.55" stroke-width="1"/>
                 @endforeach
-                <path d="M -40 -96 C -44 -62, -47 -34, -43 4 M -14 -100 C -6 -64, 3 -30, 12 9 M -26 8 C -13 -32, 3 -66, 17 -101" fill="none" stroke="#d6d1c6" stroke-width="1.1"/>
-                <path d="M -34 -92 C -36 -70, -38 -50, -38 -34 M -8 -92 C -2 -70, 3 -50, 7 -34" fill="none" stroke="#fff" stroke-opacity="0.9" stroke-width="1.6"/>
+                @foreach ($wrapTurns as $d)
+                    <path d="{{ $d }}" stroke="#fff" stroke-opacity="0.85" stroke-width="2.4" transform="translate(3 0)"/>
+                    <path d="{{ $d }}" stroke="#9c9586" stroke-opacity="0.75" stroke-width="1.1"/>
+                @endforeach
+                <rect x="-70" y="-110" width="130" height="126" fill="url(#clothShade)"/>
             </g>
 
             <path d="{{ $thumb }} C -38 -58, -46 -62, -48 -70 C -50 -76, -48 -80, -44 -84 Z" fill="#4a1f0a" fill-opacity="0.35" transform="translate(2 4)" filter="url(#fistBlur)"/>
