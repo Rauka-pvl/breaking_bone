@@ -27,7 +27,6 @@
         <section class="stage" id="stage">
             <canvas class="fx" id="fx"></canvas>
 
-            <div class="timer" id="timer">0.0</div>
             <div class="status-line" id="status">Ойыншыларды күтеміз · Ждём игроков</div>
 
             <div class="bone-wrap" id="bone">

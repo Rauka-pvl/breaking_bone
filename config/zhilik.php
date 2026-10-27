@@ -11,10 +11,11 @@ return [
     'max_players' => (int) env('ZHILIK_MAX_PLAYERS', 100),
 
     // The first player to reach exactly this many taps breaks the bone.
-    'target_taps' => (int) env('ZHILIK_TARGET_TAPS', 150),
+    'target_taps' => (int) env('ZHILIK_TARGET_TAPS', 200),
 
-    // Time limit if nobody reaches the target; then the most taps wins.
-    'max_seconds' => (int) env('ZHILIK_MAX_SECONDS', 30),
+    // There is no visible timer: the round runs until someone reaches the target.
+    // This only ends an abandoned round; then the most taps wins.
+    'max_seconds' => (int) env('ZHILIK_MAX_SECONDS', 600),
 
     'countdown_seconds' => (int) env('ZHILIK_COUNTDOWN_SECONDS', 3),
 

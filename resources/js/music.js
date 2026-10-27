@@ -4,15 +4,32 @@ const FADE_MS = 1200;
 /**
  * Looping background tracks with cross-fades. Browsers may block playback until the
  * first user gesture, so a blocked track starts again from unlock().
+ * A track is a URL or { src, start } where start (seconds) skips the intro, also on loop.
  */
 export function createMusic(tracks, { volume = 0.55, onChange = () => {} } = {}) {
-    const players = Object.fromEntries(Object.entries(tracks).map(([name, src]) => {
+    const starts = new Map();
+    const players = Object.fromEntries(Object.entries(tracks).map(([name, track]) => {
+        const { src, start = 0 } = typeof track === 'string' ? { src: track } : track;
         const audio = new Audio(src);
-        audio.loop = true;
         audio.preload = 'auto';
         audio.volume = 0;
+        starts.set(audio, start);
+        rewind(audio);
+        audio.addEventListener('ended', () => {
+            rewind(audio);
+            audio.play().catch(() => {});
+        });
         return [name, audio];
     }));
+
+    function rewind(audio) {
+        const start = starts.get(audio);
+        if (audio.readyState >= 1) {
+            audio.currentTime = start;
+        } else {
+            audio.addEventListener('loadedmetadata', () => { audio.currentTime = start; }, { once: true });
+        }
+    }
     const fades = new Map();
     let current = null;
     let blocked = false;
@@ -52,7 +69,7 @@ export function createMusic(tracks, { volume = 0.55, onChange = () => {} } = {})
             if (current === name && !restart) return;
             if (current && current !== name) stop(players[current]);
             current = name;
-            if (restart) next.currentTime = 0;
+            if (restart) rewind(next);
             if (!muted) start(next);
         },
         unlock() {

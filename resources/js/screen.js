@@ -10,7 +10,7 @@ const $ = (selector) => document.querySelector(selector);
 
 const clock = createClock();
 const music = createMusic(
-    { lobby: '/audio/argymak.mp3', game: '/audio/adai.mp3' },
+    { lobby: '/audio/argymak.mp3', game: { src: '/audio/adai.mp3', start: 17 } },
     { onChange: (muted) => $('#musicBtn')?.classList.toggle('off', muted) },
 );
 const bone = createBone({
@@ -21,7 +21,6 @@ const bone = createBone({
 const els = {
     screen: $('#screen'),
     stage: $('#stage'),
-    timer: $('#timer'),
     status: $('#status'),
     qr: $('#qr'),
     playerCount: $('#playerCount'),
@@ -61,7 +60,7 @@ QRCode.toDataURL(config.joinUrl, {
     els.qr.querySelector('img').src = src;
 });
 
-const target = () => state?.targetTaps ?? 150;
+const target = () => state?.targetTaps ?? 200;
 
 function setStatus(text) {
     els.status.textContent = text;
@@ -195,14 +194,11 @@ function onPhase(phase) {
             bone.reset();
             hideCount();
             renderLeaders([], { animate: false });
-            els.timer.classList.remove('hurry');
-            els.timer.textContent = '0.0';
             setStatus('QR-ды сканерлеңіз · Сканируйте QR');
             break;
         case 'countdown':
             bone.reset();
             lastCount = null;
-            els.timer.textContent = '0.0';
             setStatus('Дайындалыңыз! · Приготовьтесь!');
             break;
         case 'playing':
@@ -210,13 +206,10 @@ function onPhase(phase) {
             break;
         case 'judging':
             hideCount();
-            els.timer.classList.remove('hurry');
-            els.timer.textContent = ((state.endsAt - state.startsAt) / 1000).toFixed(1);
             setStatus(leaderTaps >= target() ? 'Бар! Тексеріп жатырмыз… · Есть! Проверяем…' : 'Уақыт бітті! · Время вышло!');
             break;
         case 'finished':
             hideCount();
-            els.timer.textContent = '';
             showResult();
             break;
     }
@@ -275,9 +268,6 @@ function tick() {
             setTimeout(hideCount, 800);
         }
 
-        const remaining = Math.max(0, (state.endsAt - now) / 1000);
-        els.timer.textContent = Math.max(0, (now - state.startsAt) / 1000).toFixed(1);
-        els.timer.classList.toggle('hurry', remaining <= 5);
         bone.setProgress(leaderTaps / target());
 
         if (now - lastScoreAt > 1200) {

@@ -40,7 +40,7 @@
     </section>
 
     <section class="view view-tap">
-        <div class="tap-meta"><span id="leaderInfo"></span><span class="time" id="tapTime">0.0</span></div>
+        <div class="tap-meta"><span id="leaderInfo"></span></div>
         <button class="tap-btn" id="tapBtn" type="button">
             @include('partials.bone-icon', ['id' => 'boneTap'])
             <span>Бас!</span>
@@ -70,6 +70,7 @@
             <div class="label" id="winnerLabel">Жеңімпаз · Победитель</div>
             <div class="name" id="resultWinner"></div>
             <div class="meta" id="resultWinnerMeta"></div>
+            <ol class="top3" id="resultTop"></ol>
         </div>
         <div class="after">
             <div class="result-title" id="resultTitle"></div>

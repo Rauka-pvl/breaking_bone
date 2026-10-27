@@ -1,4 +1,4 @@
-import { api, config, createClock, createEcho, formatSeconds, isEchoConnected, phaseOf } from './common';
+import { api, config, createClock, createEcho, escapeHtml, formatSeconds, isEchoConnected, phaseOf } from './common';
 
 const $ = (selector) => document.querySelector(selector);
 
@@ -14,7 +14,6 @@ const els = {
     waitCounts: $('#waitCounts'),
     phoneCount: $('#phoneCount'),
     tapBtn: $('#tapBtn'),
-    tapTime: $('#tapTime'),
     leaderInfo: $('#leaderInfo'),
     myTaps: $('#myTaps'),
     myProgress: $('#myProgress'),
@@ -29,6 +28,7 @@ const els = {
     winnerLabel: $('#winnerLabel'),
     resultWinner: $('#resultWinner'),
     resultWinnerMeta: $('#resultWinnerMeta'),
+    resultTop: $('#resultTop'),
     retryBtn: $('#retryBtn'),
 };
 
@@ -57,7 +57,7 @@ let wakeLock = null;
 
 els.nameInput.value = storage.get('name') ?? '';
 
-const target = () => state?.targetTaps ?? 150;
+const target = () => state?.targetTaps ?? 200;
 
 function setView(name) {
     if (root.dataset.view !== name) root.dataset.view = name;
@@ -176,6 +176,8 @@ function showResult() {
     els.resultWinnerMeta.textContent = winner
         ? `${winner.taps} басу${winner.timeMs != null ? ` · ${formatSeconds(winner.timeMs)}` : ' · нажатий'}`
         : '';
+    els.resultTop.innerHTML = (state.leaders ?? []).slice(1, 3).map((p) => `
+        <li><span class="medal m${p.place}">${p.place}</span><b>${escapeHtml(p.name)}</b><small>${p.taps}</small></li>`).join('');
 
     els.resultTitle.className = 'result-title';
     if (me?.place === 1) {
@@ -228,7 +230,6 @@ function tick() {
         case 'playing':
             if (changed) navigator.vibrate?.(120);
             setView(reachedAt ? 'done' : 'tap');
-            els.tapTime.textContent = Math.max(0, (now - state.startsAt) / 1000).toFixed(1);
             break;
         case 'judging':
             setView(reachedAt ? 'done' : 'judging');
