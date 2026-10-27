@@ -22,13 +22,12 @@
         ['0.9', 'M 321 115 L 326 123 L 338 124'],
     ];
 
-    // Fist fingers, pinky (outer) to index (inner): [centre x, top y, bottom y] relative to the grip point.
-    $fingers = [[-27, -22, 21], [-9, -28, 27], [9, -31, 29], [27, -29, 25]];
-    $grips = ['left' => 'translate(190 110)', 'right' => 'translate(410 110) scale(-1 1)'];
+    // Hammer fist seen from the front, index on top, pinky (striking edge) at the bottom: [top y, left x, right x].
+    $fingers = [[-78, -32, 33], [-59, -33, 35], [-40, -32, 33], [-21, -29, 29]];
 
     $pores = [[168, 104, 1.6], [196, 117, 1.1], [232, 101, 1.2], [262, 119, 0.9], [352, 103, 1.1], [384, 118, 1.3], [418, 105, 1], [446, 116, 1.4], [62, 150, 1.8], [92, 64, 1.3], [538, 156, 1.6], [508, 66, 1.2]];
 @endphp
-<svg viewBox="0 0 600 220" xmlns="http://www.w3.org/2000/svg" aria-label="Жілік">
+<svg viewBox="0 -50 600 270" xmlns="http://www.w3.org/2000/svg" aria-label="Жілік">
     <defs>
         <linearGradient id="boneBase" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0" stop-color="#fffbf2"/>
@@ -109,34 +108,29 @@
             <stop offset="0" stop-color="#fbdcbc"/>
             <stop offset="1" stop-color="#df9f72"/>
         </linearGradient>
-        <linearGradient id="sleeveGrad" x1="0.7" y1="0" x2="0.25" y2="1">
+        <linearGradient id="sleeveGrad" x1="0" y1="1" x2="0" y2="0">
             <stop offset="0" stop-color="#a3263a"/>
-            <stop offset="0.45" stop-color="#7a1528" stop-opacity="0.95"/>
+            <stop offset="0.4" stop-color="#7a1528" stop-opacity="0.95"/>
             <stop offset="1" stop-color="#4a0b18" stop-opacity="0"/>
         </linearGradient>
 
-        {{-- Behind the bone: chapan sleeve with an ornamented cuff, and the palm. --}}
-        <g id="handBack">
-            <path d="M -30 18 C -42 56, -60 92, -80 128 L -18 142 C -8 104, 6 66, 24 26 Z" fill="url(#sleeveGrad)"/>
-            <path d="M -36 30 C -16 36, 6 39, 25 35 L 21 50 C 2 54, -20 51, -41 45 Z" fill="#f2c14e" stroke="#9a6b16" stroke-width="1.5" stroke-linejoin="round"/>
-            <path d="M -32 40 C -14 45, 4 47, 20 43" fill="none" stroke="#9a6b16" stroke-width="1.2" stroke-dasharray="3 4"/>
-            @foreach ([-26, -12, 2, 15] as $i => $ox)
-                <path d="M {{ $ox }} {{ 37.5 + $i * 0.6 }} l 3 3.5 l -3 3.5 l -3 -3.5 Z" fill="#7a1528"/>
+        {{-- Origin is the striking edge of the fist; the chapan sleeve fades out upwards. --}}
+        <g id="fist" stroke-linejoin="round" stroke-linecap="round">
+            <path d="M -26 -80 L 26 -80 L 31 -175 L -31 -175 Z" fill="url(#sleeveGrad)"/>
+            <path d="M -32 -97 L 32 -97 L 31 -78 L -31 -78 Z" fill="#f2c14e" stroke="#9a6b16" stroke-width="1.5"/>
+            <path d="M -28 -87.5 L 28 -87.5" fill="none" stroke="#9a6b16" stroke-width="1.2" stroke-dasharray="3 4"/>
+            @foreach ([-20, -7, 6, 19] as $ox)
+                <path d="M {{ $ox }} -92 l 3.5 4.5 l -3.5 4.5 l -3.5 -4.5 Z" fill="#7a1528"/>
             @endforeach
-            <rect x="-41" y="-27" width="80" height="62" rx="20" fill="#c98a5c" stroke="#6b3f22" stroke-width="2.4"/>
-        </g>
-
-        {{-- In front of the bone: four fingers wrapped around it and the thumb pressing towards the middle. --}}
-        <g id="handFront" stroke-linejoin="round" stroke-linecap="round">
-            @foreach ($fingers as [$cx, $top, $bottom])
-                <rect x="{{ $cx - 9.5 }}" y="{{ $top }}" width="19" height="{{ $bottom - $top }}" rx="9.5" fill="url(#skinGrad)" stroke="#6b3f22" stroke-width="2.2"/>
-                <ellipse cx="{{ $cx }}" cy="{{ $top + 7 }}" rx="5" ry="2.8" fill="#fff" fill-opacity="0.45"/>
-                <path d="M {{ $cx - 5 }} {{ ($top + $bottom) / 2 - 1 }} q 5 3.5 10 0" fill="none" stroke="#9c5f38" stroke-width="1.6"/>
-                <path d="M {{ $cx - 4 }} {{ $bottom - 9 }} q 4 2.5 8 0" fill="none" stroke="#9c5f38" stroke-opacity="0.6" stroke-width="1.3"/>
+            <rect x="-37" y="-83" width="74" height="83" rx="22" fill="#c98a5c" stroke="#6b3f22" stroke-width="2.4"/>
+            @foreach ($fingers as [$top, $l, $r])
+                <rect x="{{ $l }}" y="{{ $top }}" width="{{ $r - $l }}" height="19.5" rx="9.75" fill="url(#skinGrad)" stroke="#6b3f22" stroke-width="2.2"/>
+                <ellipse cx="{{ $r - 12 }}" cy="{{ $top + 5.5 }}" rx="6" ry="2.4" fill="#fff" fill-opacity="0.45"/>
+                <path d="M {{ $l + 22 }} {{ $top + 4.5 }} q 3.5 5.25 0 10.5" fill="none" stroke="#9c5f38" stroke-width="1.5"/>
             @endforeach
-            <path d="M 30 -27 C 44 -32, 63 -28, 68 -19 C 72 -10, 62 -5, 50 -7 C 42 -8, 33 -7, 27 -12 Z" fill="url(#thumbGrad)" stroke="#6b3f22" stroke-width="2.2"/>
-            <path d="M 57 -24 C 63 -24, 67 -21, 66 -17 C 65 -13, 59 -13, 56 -15 C 54 -18, 54 -23, 57 -24 Z" fill="#fbe3d3" stroke="#b07a58" stroke-width="1"/>
-            <path d="M 40 -13 q 3 -4 6 -1" fill="none" stroke="#9c5f38" stroke-width="1.4"/>
+            <path d="M -39 -67 C -22 -78, 5 -75, 18 -65 C 26 -58, 22 -49, 12 -50 C -3 -51, -22 -51, -37 -53 Z" fill="url(#thumbGrad)" stroke="#6b3f22" stroke-width="2.2"/>
+            <path d="M 9 -64 C 15 -65, 20 -62, 20 -58 C 20 -54, 14 -53, 10 -55 C 7 -57, 6 -62, 9 -64 Z" fill="#fbe3d3" stroke="#b07a58" stroke-width="1"/>
+            <path d="M -14 -57 q 4 -3.5 8 0" fill="none" stroke="#9c5f38" stroke-width="1.4"/>
         </g>
     </defs>
 
@@ -157,7 +151,6 @@
 
         @foreach (['left' => ['clipLeft', 'clipLeftUnder'], 'right' => ['clipRight', 'clipRight']] as $half => [$clip, $bodyClip])
             <g class="bone-half half-{{ $half }}">
-                <g class="hand" opacity="0"><use href="#handBack" transform="{{ $grips[$half] }}"/></g>
                 <use href="#boneBody" clip-path="url(#{{ $bodyClip }})"/>
                 <g clip-path="url(#{{ $clip }})">
                     <g clip-path="url(#clipBone)">
@@ -178,8 +171,9 @@
                     <polyline points="{{ $jagged }}" stroke="#b48a52" stroke-width="3.5" stroke-dasharray="1.5 4"/>
                     <polyline points="{{ $jagged }}" stroke="#7a4f2a" stroke-width="1.6"/>
                 </g>
-                <g class="hand" opacity="0"><use href="#handFront" transform="{{ $grips[$half] }}"/></g>
             </g>
         @endforeach
+
+        <g class="fist" opacity="0"><use href="#fist" transform="translate(300 58) scale(0.95)"/></g>
     </g>
 </svg>

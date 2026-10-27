@@ -1,8 +1,22 @@
 const VIEW_W = 600;
-const VIEW_H = 220;
+const VIEW_TOP = -50;
+const VIEW_H = 270;
 const CENTER_Y = 110;
+const BONE_TOP = 93;
 const GRAVITY = 1500;
 const HIT_STOP = 0.07;
+
+// Fist strike timeline, ms: wind up, slam down onto the bone, stay on it, recoil back to hover.
+const WINDUP = 120;
+const SLAM = 70;
+const HOLD = 50;
+const RECOIL = 210;
+const STRIKE_MS = WINDUP + SLAM + HOLD + RECOIL;
+const STRIKE_GAP = 420;
+const FIST_LIFT = 28;
+const FIST_CONTACT = 37;
+const FINAL_WINDUP = 150;
+const FINAL_SLAM = 60;
 
 const clamp = (v, min = 0, max = 1) => Math.min(max, Math.max(min, v));
 const lerp = (a, b, t) => a + (b - a) * t;
@@ -15,32 +29,40 @@ const pick = (list) => list[Math.floor(Math.random() * list.length)];
 const CONFETTI_COLORS = ['#00afca', '#5fd4e6', '#f2c14e', '#ffe08a', '#ffffff'];
 const SPARK_COLORS = ['#fff6d8', '#ffe08a', '#f2c14e', '#ffb347'];
 
-export function createBone({ wrap, canvas }) {
+export function createBone({ wrap, canvas, onImpact = () => {} }) {
     const rig = wrap.querySelector('.bone-rig');
     const left = wrap.querySelector('.half-left');
     const right = wrap.querySelector('.half-right');
     const shadow = wrap.querySelector('.bone-shadow');
     const rays = wrap.querySelector('.bone-rays');
     const halo = wrap.querySelector('.bone-halo');
+    const fist = wrap.querySelector('.fist');
     const edges = [...wrap.querySelectorAll('.edge')];
     const stress = [...wrap.querySelectorAll('.stress')];
     const sheens = [...wrap.querySelectorAll('.sheen')];
     const cracks = [...wrap.querySelectorAll('.crack')].map((el) => ({ el, at: Number(el.dataset.at), shown: -1 }));
-    const hands = [...wrap.querySelectorAll('.hand')].map((el) => ({ el, dir: el.closest('.half-left') ? -1 : 1 }));
     const ctx = canvas.getContext('2d');
-
-    let gripTarget = 0;
-    let gripFrom = 0;
-    let gripAt = 0;
 
     let progress = 0;
     let energy = 0;
     let brokenAt = null;
+    let finalAt = null;
     let appearAt = performance.now();
     let pulseAt = null;
     let lastT = performance.now();
     let crackStage = 0;
     const particles = [];
+
+    let gripTarget = 0;
+    let gripFrom = 0;
+    let gripAt = 0;
+
+    let strikeAt = null;
+    let strikeHit = false;
+    let strikeQueued = false;
+    let lastStrikeAt = 0;
+    let impactAt = null;
+    let impactPower = 0;
 
     function resize() {
         const dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -54,15 +76,20 @@ export function createBone({ wrap, canvas }) {
         const r = wrap.getBoundingClientRect();
         return {
             x: r.left - c.left + r.width / 2,
-            y: r.top - c.top + (CENTER_Y / VIEW_H) * r.height,
+            y: r.top - c.top + ((CENTER_Y - VIEW_TOP) / VIEW_H) * r.height,
             scale: r.width / VIEW_W,
         };
+    }
+
+    function contactFrame() {
+        const f = boneFrame();
+        return { ...f, y: f.y - (CENTER_Y - BONE_TOP) * f.scale };
     }
 
     function renderCracks() {
         let stage = 0;
         for (const crack of cracks) {
-            const local = brokenAt ? 1 : clamp((progress - crack.at) / 0.1);
+            const local = brokenAt || finalAt ? 1 : clamp((progress - crack.at) / 0.1);
             if (local > 0) stage += 1;
             const value = Math.round((1 - local) * 1000) / 1000;
             if (value !== crack.shown) {
@@ -119,7 +146,7 @@ export function createBone({ wrap, canvas }) {
         }
     }
 
-    function spawnSparks(f, count, speed = 1) {
+    function spawnSparks(f, count, speed = 1, colors = SPARK_COLORS) {
         for (let i = 0; i < count; i++) {
             const a = rand(0, Math.PI * 2);
             const s = rand(400, 1200) * speed;
@@ -132,7 +159,7 @@ export function createBone({ wrap, canvas }) {
                 life: rand(0.35, 0.8),
                 age: 0,
                 width: rand(1.5, 3.5),
-                color: pick(SPARK_COLORS),
+                color: pick(colors),
             });
         }
     }
@@ -141,8 +168,8 @@ export function createBone({ wrap, canvas }) {
         particles.push({ type: 'ring', x: f.x, y: f.y, radius: radius * f.scale, width, life, age: -delay, color });
     }
 
-    function spawnBurst(f, radius = 240) {
-        particles.push({ type: 'burst', x: f.x, y: f.y, radius: radius * f.scale, life: 0.45, age: 0 });
+    function spawnBurst(f, radius = 240, life = 0.45) {
+        particles.push({ type: 'burst', x: f.x, y: f.y, radius: radius * f.scale, life, age: 0 });
     }
 
     function spawnConfetti(count) {
@@ -276,6 +303,98 @@ export function createBone({ wrap, canvas }) {
     }
 
     /* ---------------------------------------------------------------- */
+    /* Fist                                                             */
+    /* ---------------------------------------------------------------- */
+
+    function gripValue(t) {
+        const p = clamp((t - gripAt) / (gripTarget ? 650 : 450));
+        const e = gripTarget ? easeOutBack(p, 1.3) : p * p;
+        return lerp(gripFrom, gripTarget, e);
+    }
+
+    function impact(t, power) {
+        impactAt = t;
+        impactPower = power;
+        energy = Math.min(3, energy + 0.5 * power);
+        const f = contactFrame();
+        spawnBurst(f, 70 + 40 * power, 0.22);
+        spawnRing(f, { radius: 110 + 60 * power, width: 5, life: 0.35, color: '255, 248, 230' });
+        spawnSparks(f, 5 + Math.round(power * 4), 0.35, ['#ffffff', '#fff6d8', '#ffe08a']);
+        const chips = 2 + Math.round(power * 3);
+        for (let i = 0; i < chips; i++) {
+            spawnShard(f, { angle: rand(-Math.PI * 0.95, -Math.PI * 0.05), size: rand(2, 4.5), speed: rand(180, 460), life: rand(0.6, 1.1) });
+        }
+        spawnDust(f, 2, 0.45);
+        onImpact(power);
+    }
+
+    function strikePose(s) {
+        if (s < WINDUP) {
+            const p = easeOutCubic(s / WINDUP);
+            return { dy: -FIST_LIFT * p, rot: -9 * p };
+        }
+        if (s < WINDUP + SLAM) {
+            const p = (s - WINDUP) / SLAM;
+            return { dy: lerp(-FIST_LIFT, FIST_CONTACT, p * p), rot: lerp(-9, 3, p) };
+        }
+        if (s < WINDUP + SLAM + HOLD) return { dy: FIST_CONTACT, rot: 3 };
+        const p = easeOutCubic(clamp((s - WINDUP - SLAM - HOLD) / RECOIL));
+        return { dy: lerp(FIST_CONTACT, 0, p), rot: lerp(3, 0, p) };
+    }
+
+    function renderFist(t, time) {
+        const g = gripValue(t);
+        let dy = Math.sin(time * 2.6) * 3;
+        let rot = 0;
+        let opacity = clamp(g * 1.6);
+
+        if (brokenAt) {
+            const st = (t - brokenAt) / 1000 - HIT_STOP;
+            if (st < 0) {
+                dy = FIST_CONTACT;
+            } else if (st < 0.14) {
+                dy = lerp(FIST_CONTACT, FIST_CONTACT + 45, easeOutCubic(st / 0.14));
+            } else {
+                dy = lerp(FIST_CONTACT + 45, -70, easeInOutSine(clamp((st - 0.14) / 0.85)));
+                rot = -6 * clamp((st - 0.14) / 0.5);
+            }
+            opacity *= 1 - clamp((st - 0.45) / 0.6);
+        } else if (finalAt) {
+            const s = t - finalAt;
+            if (s < FINAL_WINDUP) {
+                const p = easeOutCubic(s / FINAL_WINDUP);
+                dy = -FIST_LIFT * 1.5 * p;
+                rot = -14 * p;
+            } else {
+                const p = clamp((s - FINAL_WINDUP) / FINAL_SLAM);
+                dy = lerp(-FIST_LIFT * 1.5, FIST_CONTACT, p * p);
+                rot = lerp(-14, 4, p);
+            }
+        } else if (strikeAt !== null) {
+            const s = t - strikeAt;
+            if (!strikeHit && s >= WINDUP + SLAM) {
+                strikeHit = true;
+                impact(t, 0.5 + progress);
+            }
+            if (s >= STRIKE_MS) strikeAt = null;
+            ({ dy, rot } = strikePose(Math.min(s, STRIKE_MS)));
+        }
+
+        let sx = 1;
+        let sy = 1;
+        if (impactAt !== null && !brokenAt) {
+            const q = 1 - clamp((t - impactAt) / 90);
+            sx = 1 + 0.07 * q;
+            sy = 1 - 0.09 * q;
+        }
+
+        dy -= 190 * (1 - g);
+        fist.style.transform = `translate(0px, ${dy.toFixed(2)}px) rotate(${rot.toFixed(2)}deg) scale(${sx.toFixed(3)}, ${sy.toFixed(3)})`;
+        fist.style.opacity = opacity.toFixed(3);
+        return clamp(g);
+    }
+
+    /* ---------------------------------------------------------------- */
     /* Bone pose                                                        */
     /* ---------------------------------------------------------------- */
 
@@ -285,91 +404,75 @@ export function createBone({ wrap, canvas }) {
         for (const el of sheens) el.setAttribute('x', String(Math.round(x)));
     }
 
-    function gripValue(t) {
-        const p = clamp((t - gripAt) / (gripTarget ? 700 : 450));
-        const e = gripTarget ? easeOutBack(p, 1.4) : p * p;
-        return lerp(gripFrom, gripTarget, e);
-    }
-
-    function renderHands(t, time) {
-        const g = gripValue(t);
-        const off = 1 - g;
-        const strain = brokenAt ? 0 : progress;
-        for (const { el, dir } of hands) {
-            const press = Math.sin(time * 34 + dir) * strain * strain * 1.4;
-            const inward = -dir * strain * 3;
-            const x = dir * 90 * off + inward;
-            const y = 140 * off + press;
-            el.style.transform = `translate(${x.toFixed(2)}px, ${y.toFixed(2)}px) rotate(${(-dir * 28 * off).toFixed(2)}deg)`;
-            el.style.opacity = clamp(g * 1.6).toFixed(3);
-        }
-        return clamp(g);
-    }
-
     function renderIntact(t, time) {
-        const gripped = renderHands(t, time);
+        const gripped = renderFist(t, time);
         const ap = clamp((t - appearAt) / 600);
         const appear = lerp(0.82, 1, easeOutBack(ap, 2.2));
         const pp = pulseAt ? clamp((t - pulseAt) / 420) : 1;
         const pulse = 1 + 0.055 * Math.sin(pp * Math.PI) * (1 - pp * 0.4);
 
-        const calm = (1 - clamp(progress * 4)) * (1 - 0.55 * gripped);
+        const since = impactAt === null ? Infinity : t - impactAt;
+        const kick = Number.isFinite(since) ? Math.exp(-since / 110) * impactPower : 0;
+        const ring = Number.isFinite(since) ? Math.sin(since * 0.06) * Math.exp(-since / 160) * impactPower : 0;
+
+        const calm = (1 - clamp(progress * 4)) * (1 - 0.6 * gripped);
         const bob = Math.sin(time * 1.7) * 6 * calm;
         const sway = Math.sin(time * 0.9) * 1.2 * calm;
-        rig.style.transform = `translate(0px, ${bob.toFixed(2)}px) rotate(${sway.toFixed(2)}deg) scale(${(appear * pulse).toFixed(4)})`;
+        const drop = bob + 7 * kick;
+        rig.style.transform = `translate(0px, ${drop.toFixed(2)}px) rotate(${sway.toFixed(2)}deg) scale(${(appear * pulse).toFixed(4)})`;
         rig.style.opacity = String(clamp(ap * 1.6));
 
-        const shake = energy * 4 + progress * progress * 3.5;
+        const shake = energy * 3 + progress * progress * 2.5;
         const sx = (Math.random() - 0.5) * shake;
         const sy = (Math.random() - 0.5) * shake;
-        const tremble = progress > 0.55 ? Math.sin(time * 70) * (progress - 0.55) * 2.2 : 0;
-        const bend = Math.pow(progress, 1.5) * 11;
+        const tremble = progress > 0.6 ? Math.sin(time * 70) * (progress - 0.6) * 2 : 0;
+        const bend = Math.pow(progress, 1.5) * 6 + 7 * kick + 2 * ring;
         left.style.transform = `translate(${sx.toFixed(2)}px, ${sy.toFixed(2)}px) rotate(${(bend + tremble).toFixed(2)}deg)`;
         right.style.transform = `translate(${sx.toFixed(2)}px, ${sy.toFixed(2)}px) rotate(${(-bend - tremble).toFixed(2)}deg)`;
 
-        const heat = Math.pow(progress, 1.7) * (0.82 + 0.18 * Math.sin(time * 12));
+        const heat = clamp(Math.pow(progress, 1.7) * (0.82 + 0.18 * Math.sin(time * 12)) + 0.35 * kick);
         for (const el of stress) el.setAttribute('opacity', heat.toFixed(3));
 
-        shadow.setAttribute('rx', (250 - bob * 2.2).toFixed(1));
-        shadow.setAttribute('opacity', (0.4 - bob * 0.012).toFixed(3));
+        shadow.setAttribute('rx', (250 - drop * 2.2).toFixed(1));
+        shadow.setAttribute('opacity', (0.4 - drop * 0.012).toFixed(3));
 
         setSheen(time, progress > 0.02 ? 9999 : 3.6, 1.3);
     }
 
     function renderBroken(t, time) {
-        renderHands(t, time);
+        renderFist(t, time);
         const bt = (t - brokenAt) / 1000;
         rig.style.transform = 'none';
         rig.style.opacity = '1';
 
         if (bt < HIT_STOP) {
             const jolt = (Math.random() - 0.5) * 10;
-            left.style.transform = `translate(${jolt}px, ${-jolt}px) rotate(12deg)`;
-            right.style.transform = `translate(${jolt}px, ${jolt}px) rotate(-12deg)`;
+            left.style.transform = `translate(${jolt}px, ${8 - jolt}px) rotate(12deg)`;
+            right.style.transform = `translate(${jolt}px, ${8 + jolt}px) rotate(-12deg)`;
             return;
         }
 
         const st = bt - HIT_STOP;
-        const split = easeOutCubic(clamp(st / 0.55));
-        const rise = easeOutBack(clamp((st - 0.8) / 0.9), 1.4);
-        const float = st > 1.7 ? Math.sin((st - 1.7) * 2.2) * 5 : 0;
+        const split = easeOutCubic(clamp(st / 0.5));
+        const rise = easeOutBack(clamp((st - 0.85) / 0.9), 1.4);
+        const float = st > 1.75 ? Math.sin((st - 1.75) * 2.2) * 5 : 0;
         const wobble = Math.sin(st * 22) * Math.exp(-st * 4) * 6;
 
         for (const [el, dir] of [[left, -1], [right, 1]]) {
-            const dx = dir * (150 * split - 36 * rise);
-            const dy = 34 * split - 82 * rise + float * (dir === -1 ? 1 : 0.8);
-            const angle = lerp(12 + 24 * split, -16, clamp(rise, 0, 1.1)) + wobble;
+            const dx = dir * (130 * split - 20 * rise);
+            const dy = 56 * split - 100 * rise + float * (dir === -1 ? 1 : 0.8);
+            const angle = lerp(14 + 22 * split, -12, clamp(rise, 0, 1.1)) + wobble;
             el.style.transform = `translate(${dx.toFixed(2)}px, ${dy.toFixed(2)}px) rotate(${(-dir * angle).toFixed(2)}deg)`;
         }
 
         for (const el of stress) el.setAttribute('opacity', (Math.max(0, 1 - st * 3)).toFixed(3));
 
-        const glow = clamp((st - 0.75) / 0.6);
+        const glow = clamp((st - 0.8) / 0.6);
         rays.setAttribute('opacity', (glow * 0.6).toFixed(3));
         rays.style.transform = `rotate(${(time * 10) % 360}deg) scale(${(0.6 + 0.4 * easeOutCubic(glow)).toFixed(3)})`;
         halo.setAttribute('opacity', (glow * (0.75 + 0.15 * Math.sin(time * 3))).toFixed(3));
 
-        shadow.setAttribute('rx', (250 + 150 * split - 40 * clamp(rise)).toFixed(1));
+        shadow.setAttribute('rx', (250 + 130 * split - 40 * clamp(rise)).toFixed(1));
         shadow.setAttribute('opacity', (0.4 - 0.22 * split).toFixed(3));
 
         setSheen(time, 2.6, 1.1);
@@ -381,6 +484,13 @@ export function createBone({ wrap, canvas }) {
         const time = t / 1000;
         energy *= 0.9;
 
+        if (strikeQueued && strikeAt === null && !finalAt && !brokenAt && gripValue(t) > 0.9 && t - lastStrikeAt >= STRIKE_GAP) {
+            strikeQueued = false;
+            strikeAt = t;
+            strikeHit = false;
+            lastStrikeAt = t;
+        }
+
         if (brokenAt) renderBroken(t, time);
         else renderIntact(t, time);
 
@@ -389,17 +499,46 @@ export function createBone({ wrap, canvas }) {
         requestAnimationFrame(loop);
     }
 
+    function shatter(onBreak) {
+        brokenAt = performance.now();
+        renderCracks();
+        onBreak?.();
+
+        const f = boneFrame();
+        setTimeout(() => {
+            edges.forEach((e) => e.setAttribute('opacity', '1'));
+            spawnBurst(contactFrame());
+            spawnRing(f);
+            spawnRing(f, { delay: 0.12, radius: 560, width: 6, life: 0.9, color: '242, 193, 78' });
+            spawnSparks(f, 46);
+            for (let i = 0; i < 64; i++) spawnShard(f);
+            for (let i = 0; i < 22; i++) spawnShard(f, { angle: rand(0, Math.PI * 2), speed: rand(500, 1300), size: rand(3, 7) });
+            spawnDust(f, 24);
+        }, HIT_STOP * 1000);
+
+        setTimeout(() => {
+            wrap.classList.add('glow');
+            spawnSparks(f, 24, 0.6);
+            spawnConfetti(220);
+        }, 900);
+        setTimeout(() => spawnConfetti(140), 2200);
+    }
+
     resize();
     window.addEventListener('resize', resize);
     requestAnimationFrame(loop);
 
     return {
         reset() {
-            const wasUsed = brokenAt !== null || progress > 0;
+            const wasUsed = brokenAt !== null || finalAt !== null || progress > 0;
             progress = 0;
             energy = 0;
             crackStage = 0;
             brokenAt = null;
+            finalAt = null;
+            strikeAt = null;
+            strikeQueued = false;
+            impactAt = null;
             particles.length = 0;
             if (wasUsed) appearAt = performance.now();
             wrap.classList.remove('glow');
@@ -410,15 +549,10 @@ export function createBone({ wrap, canvas }) {
         },
 
         setProgress(value) {
-            if (brokenAt) return;
+            if (brokenAt || finalAt) return;
             progress = clamp(value);
             const stage = renderCracks();
-            if (stage > crackStage) {
-                const f = boneFrame();
-                for (let i = 0; i < 4; i++) spawnShard(f, { size: rand(2, 4), speed: rand(120, 320), life: rand(0.5, 0.9) });
-                spawnDust(f, 3, 0.5);
-                energy = Math.min(3, energy + 0.8);
-            }
+            if (stage > crackStage) spawnDust(boneFrame(), 3, 0.5);
             crackStage = stage;
         },
 
@@ -436,44 +570,26 @@ export function createBone({ wrap, canvas }) {
         },
 
         hit(amount) {
-            if (brokenAt || amount <= 0) return;
-            energy = Math.min(3, energy + amount * 0.04);
-            const f = boneFrame();
-            const chips = Math.min(5, Math.ceil(amount / 18));
-            for (let i = 0; i < chips; i++) {
-                spawnShard(f, { size: rand(2, 4.5), speed: rand(150, 420), life: rand(0.6, 1.1) });
-            }
+            if (brokenAt || finalAt || amount <= 0) return;
+            strikeQueued = true;
         },
 
-        breakBone() {
-            if (brokenAt) return;
-            this.grip(true);
-            brokenAt = performance.now();
+        breakBone(onBreak) {
+            if (brokenAt || finalAt) return;
+            gripTarget = 1;
+            gripFrom = 1;
+            strikeAt = null;
             progress = 1;
+            const startedAt = performance.now();
+            finalAt = startedAt;
             renderCracks();
-
-            const f = boneFrame();
             setTimeout(() => {
-                edges.forEach((e) => e.setAttribute('opacity', '1'));
-                spawnBurst(f);
-                spawnRing(f);
-                spawnRing(f, { delay: 0.12, radius: 560, width: 6, life: 0.9, color: '242, 193, 78' });
-                spawnSparks(f, 46);
-                for (let i = 0; i < 64; i++) spawnShard(f);
-                for (let i = 0; i < 22; i++) spawnShard(f, { angle: rand(0, Math.PI * 2), speed: rand(500, 1300), size: rand(3, 7) });
-                spawnDust(f, 24);
-            }, HIT_STOP * 1000);
-
-            setTimeout(() => {
-                wrap.classList.add('glow');
-                spawnSparks(f, 24, 0.6);
-                spawnConfetti(220);
-            }, 900);
-            setTimeout(() => spawnConfetti(140), 2200);
+                if (finalAt === startedAt && !brokenAt) shatter(onBreak);
+            }, FINAL_WINDUP + FINAL_SLAM);
         },
 
         isBroken() {
-            return brokenAt !== null;
+            return brokenAt !== null || finalAt !== null;
         },
     };
 }

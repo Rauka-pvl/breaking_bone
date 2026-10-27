@@ -8,7 +8,11 @@ import { createBone } from './bone';
 const $ = (selector) => document.querySelector(selector);
 
 const clock = createClock();
-const bone = createBone({ wrap: $('#bone'), canvas: $('#fx') });
+const bone = createBone({
+    wrap: $('#bone'),
+    canvas: $('#fx'),
+    onImpact: (power) => beep(70 + 50 * power, 0.09, 0.12 + 0.1 * power),
+});
 const els = {
     screen: $('#screen'),
     stage: $('#stage'),
@@ -141,14 +145,15 @@ function setButtons(phase) {
 
 function showResult() {
     if (!bone.isBroken()) {
-        bone.breakBone();
-        crackSound();
-        els.flash.classList.remove('go');
-        void els.flash.offsetWidth;
-        els.flash.classList.add('go');
-        els.screen.classList.remove('quake');
-        void els.screen.offsetWidth;
-        els.screen.classList.add('quake');
+        bone.breakBone(() => {
+            crackSound();
+            els.flash.classList.remove('go');
+            void els.flash.offsetWidth;
+            els.flash.classList.add('go');
+            els.screen.classList.remove('quake');
+            void els.screen.offsetWidth;
+            els.screen.classList.add('quake');
+        });
     }
 
     const winner = state.winner;
