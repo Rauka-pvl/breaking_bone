@@ -15,6 +15,8 @@ const STRIKE_MS = WINDUP + SLAM + HOLD + RECOIL;
 const STRIKE_GAP = 420;
 const FIST_LIFT = 28;
 const FIST_CONTACT = 41;
+// Degrees the arm swings back around the shoulder while winding up.
+const SWING = 6;
 const FINAL_WINDUP = 150;
 const FINAL_SLAM = 60;
 
@@ -37,6 +39,7 @@ export function createBone({ wrap, canvas, onImpact = () => {} }) {
     const rays = wrap.querySelector('.bone-rays');
     const halo = wrap.querySelector('.bone-halo');
     const fist = wrap.querySelector('.fist');
+    const squash = wrap.querySelector('.fist-squash');
     const trail = wrap.querySelector('.fist-trail');
     const edges = [...wrap.querySelectorAll('.edge')];
     const stress = [...wrap.querySelectorAll('.stress')];
@@ -332,15 +335,15 @@ export function createBone({ wrap, canvas, onImpact = () => {} }) {
     function strikePose(s) {
         if (s < WINDUP) {
             const p = easeOutCubic(s / WINDUP);
-            return { dy: -FIST_LIFT * p, rot: -9 * p };
+            return { dy: -FIST_LIFT * p, rot: -SWING * p };
         }
         if (s < WINDUP + SLAM) {
             const p = (s - WINDUP) / SLAM;
-            return { dy: lerp(-FIST_LIFT, FIST_CONTACT, p * p), rot: lerp(-9, 3, p) };
+            return { dy: lerp(-FIST_LIFT, FIST_CONTACT, p * p), rot: lerp(-SWING, 0, p * p) };
         }
-        if (s < WINDUP + SLAM + HOLD) return { dy: FIST_CONTACT, rot: 3 };
+        if (s < WINDUP + SLAM + HOLD) return { dy: FIST_CONTACT, rot: 0 };
         const p = easeOutCubic(clamp((s - WINDUP - SLAM - HOLD) / RECOIL));
-        return { dy: lerp(FIST_CONTACT, 0, p), rot: lerp(3, 0, p) };
+        return { dy: lerp(FIST_CONTACT, 0, p), rot: 0 };
     }
 
     function renderFist(t, time) {
@@ -361,7 +364,7 @@ export function createBone({ wrap, canvas, onImpact = () => {} }) {
                 streak = 1 - st / 0.14;
             } else {
                 dy = lerp(FIST_CONTACT + 45, -70, easeInOutSine(clamp((st - 0.14) / 0.85)));
-                rot = -6 * clamp((st - 0.14) / 0.5);
+                rot = -SWING * easeInOutSine(clamp((st - 0.14) / 0.85));
             }
             opacity *= 1 - clamp((st - 0.45) / 0.6);
         } else if (finalAt) {
@@ -369,11 +372,11 @@ export function createBone({ wrap, canvas, onImpact = () => {} }) {
             if (s < FINAL_WINDUP) {
                 const p = easeOutCubic(s / FINAL_WINDUP);
                 dy = -FIST_LIFT * 1.5 * p;
-                rot = -14 * p;
+                rot = -SWING * 1.6 * p;
             } else {
                 const p = clamp((s - FINAL_WINDUP) / FINAL_SLAM);
                 dy = lerp(-FIST_LIFT * 1.5, FIST_CONTACT, p * p);
-                rot = lerp(-14, 4, p);
+                rot = lerp(-SWING * 1.6, 0, p * p);
                 streak = clamp(p * 1.4);
                 falling = true;
             }
@@ -404,8 +407,10 @@ export function createBone({ wrap, canvas, onImpact = () => {} }) {
             sy = 1 - 0.09 * q;
         }
 
+        const dx = -120 * (1 - g);
         dy -= 200 * (1 - g);
-        fist.style.transform = `translate(0px, ${dy.toFixed(2)}px) rotate(${rot.toFixed(2)}deg) scale(${sx.toFixed(3)}, ${sy.toFixed(3)})`;
+        fist.style.transform = `translate(${dx.toFixed(2)}px, ${dy.toFixed(2)}px) rotate(${rot.toFixed(2)}deg)`;
+        squash.style.transform = `scale(${sx.toFixed(3)}, ${sy.toFixed(3)})`;
         fist.style.opacity = opacity.toFixed(3);
         trail.setAttribute('opacity', (streak * 0.85).toFixed(3));
         return clamp(g);
