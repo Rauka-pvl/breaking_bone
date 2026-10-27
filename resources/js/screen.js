@@ -176,6 +176,7 @@ function onPhase(phase) {
     els.stage.classList.toggle('finished', phase === 'finished');
     els.qr.classList.toggle('dim', phase !== 'lobby' && phase !== 'finished');
     setButtons(phase);
+    bone.grip(phase !== 'lobby');
 
     switch (phase) {
         case 'lobby':

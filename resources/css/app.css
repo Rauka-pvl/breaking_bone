@@ -234,6 +234,7 @@ html, body {
 .bone-wrap svg { width: 100%; height: 100%; overflow: visible; }
 .bone-rig, .bone-rays { transform-box: view-box; transform-origin: 300px 110px; will-change: transform; }
 .bone-half { transform-box: view-box; transform-origin: 300px 127px; will-change: transform; }
+.bone-wrap .hand { transform-box: fill-box; transform-origin: 50% 30%; will-change: transform, opacity; }
 .bone-wrap.glow .bone-half { filter: drop-shadow(0 0 10px rgba(255, 231, 163, 0.9)) drop-shadow(0 0 34px rgba(242, 193, 78, 0.65)); }
 
 .race { width: 100%; max-width: 52vw; display: flex; flex-direction: column; align-items: center; gap: 1vh; }

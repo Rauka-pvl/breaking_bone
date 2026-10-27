@@ -26,7 +26,12 @@ export function createBone({ wrap, canvas }) {
     const stress = [...wrap.querySelectorAll('.stress')];
     const sheens = [...wrap.querySelectorAll('.sheen')];
     const cracks = [...wrap.querySelectorAll('.crack')].map((el) => ({ el, at: Number(el.dataset.at), shown: -1 }));
+    const hands = [...wrap.querySelectorAll('.hand')].map((el) => ({ el, dir: el.closest('.half-left') ? -1 : 1 }));
     const ctx = canvas.getContext('2d');
+
+    let gripTarget = 0;
+    let gripFrom = 0;
+    let gripAt = 0;
 
     let progress = 0;
     let energy = 0;
@@ -280,13 +285,35 @@ export function createBone({ wrap, canvas }) {
         for (const el of sheens) el.setAttribute('x', String(Math.round(x)));
     }
 
+    function gripValue(t) {
+        const p = clamp((t - gripAt) / (gripTarget ? 700 : 450));
+        const e = gripTarget ? easeOutBack(p, 1.4) : p * p;
+        return lerp(gripFrom, gripTarget, e);
+    }
+
+    function renderHands(t, time) {
+        const g = gripValue(t);
+        const off = 1 - g;
+        const strain = brokenAt ? 0 : progress;
+        for (const { el, dir } of hands) {
+            const press = Math.sin(time * 34 + dir) * strain * strain * 1.4;
+            const inward = -dir * strain * 3;
+            const x = dir * 90 * off + inward;
+            const y = 140 * off + press;
+            el.style.transform = `translate(${x.toFixed(2)}px, ${y.toFixed(2)}px) rotate(${(-dir * 28 * off).toFixed(2)}deg)`;
+            el.style.opacity = clamp(g * 1.6).toFixed(3);
+        }
+        return clamp(g);
+    }
+
     function renderIntact(t, time) {
+        const gripped = renderHands(t, time);
         const ap = clamp((t - appearAt) / 600);
         const appear = lerp(0.82, 1, easeOutBack(ap, 2.2));
         const pp = pulseAt ? clamp((t - pulseAt) / 420) : 1;
         const pulse = 1 + 0.055 * Math.sin(pp * Math.PI) * (1 - pp * 0.4);
 
-        const calm = 1 - clamp(progress * 4);
+        const calm = (1 - clamp(progress * 4)) * (1 - 0.55 * gripped);
         const bob = Math.sin(time * 1.7) * 6 * calm;
         const sway = Math.sin(time * 0.9) * 1.2 * calm;
         rig.style.transform = `translate(0px, ${bob.toFixed(2)}px) rotate(${sway.toFixed(2)}deg) scale(${(appear * pulse).toFixed(4)})`;
@@ -310,6 +337,7 @@ export function createBone({ wrap, canvas }) {
     }
 
     function renderBroken(t, time) {
+        renderHands(t, time);
         const bt = (t - brokenAt) / 1000;
         rig.style.transform = 'none';
         rig.style.opacity = '1';
@@ -398,6 +426,15 @@ export function createBone({ wrap, canvas }) {
             pulseAt = performance.now();
         },
 
+        grip(on) {
+            const next = on ? 1 : 0;
+            if (next === gripTarget) return;
+            const now = performance.now();
+            gripFrom = gripValue(now);
+            gripTarget = next;
+            gripAt = now;
+        },
+
         hit(amount) {
             if (brokenAt || amount <= 0) return;
             energy = Math.min(3, energy + amount * 0.04);
@@ -410,6 +447,7 @@ export function createBone({ wrap, canvas }) {
 
         breakBone() {
             if (brokenAt) return;
+            this.grip(true);
             brokenAt = performance.now();
             progress = 1;
             renderCracks();
